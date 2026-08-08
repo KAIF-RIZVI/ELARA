@@ -1,0 +1,75 @@
+# Phase Y: Enterprise Workspace Foundation 🏢
+
+This document outlines the architectural plan for building the complete Enterprise Workspace Foundation in ELARA. This foundation establishes a highly secure, multi-tenant boundary for companies to manage their teams, projects, and access control.
+
+## Proposed Changes
+
+### 1. Database Schema Refinements & Additions
+We will reuse the existing tables and maintain UUID/FK integrity while introducing missing models for Teams and Invitations.
+
+#### [MODIFY] `backend/app/models/identity.py`
+- Update `MemberRole` enum to include `SUPPORT` and `VIEWER`.
+- Create new model: `WorkspaceInvitation` to track pending email invites (id, workspace_id, email, token, role, status, expires_at).
+
+#### [MODIFY] `backend/app/models/workspace.py`
+- Add `description` and `logo_url` to the `Workspace` model to support the dashboard UI.
+
+#### [NEW] `backend/app/models/team.py`
+- Create `Team` (id, workspace_id, name, description, lead_id).
+- Create `TeamMember` associative table (team_id, user_id).
+
+### 2. Backend REST APIs
+We will create and extend controllers in `backend/app/api/v1/endpoints/`.
+
+#### [MODIFY] `workspaces.py`
+- Add `GET /{id}` (Overview dashboard metrics: members count, projects count, repos count, etc.).
+- Add `PUT /{id}` (Update description, logo, timezone).
+- Add `DELETE /{id}` (Soft delete workspace).
+
+#### [NEW] `members.py` (Workspace Members & Invites)
+- Add `GET /workspaces/{id}/members` (List all members).
+- Add `POST /workspaces/{id}/invites` (Send invitation email).
+- Add `PUT /workspaces/{id}/members/{user_id}` (Change role, suspend/reactivate).
+- Add `DELETE /workspaces/{id}/members/{user_id}` (Remove member).
+
+#### [NEW] `teams.py` (Team Management)
+- CRUD for teams within a workspace.
+- Add/remove members to a team.
+
+#### [NEW] `projects.py` (Project Management)
+- CRUD for projects within a workspace.
+
+### 3. Frontend Implementation (Next.js + shadcn/ui)
+We will build a high-density, enterprise-grade Next.js layout following GitHub/Linear design aesthetics.
+
+#### [NEW] `frontend/app/workspaces/[slug]/layout.tsx`
+- The central navigation hub sidebar (Overview, Members, Teams, Projects, Repositories, Activity, Settings).
+- Tenant-safe context provider to ensure all child routes operate strictly within the `slug` context.
+
+#### [NEW] Frontend Pages
+- `page.tsx` (Overview Dashboard - Metrics & Activity).
+- `members/page.tsx` (DataTable with actions: Invite, Remove, Change Role).
+- `teams/page.tsx` (Grid of teams, member counts).
+- `projects/page.tsx` (List of projects).
+- `settings/page.tsx` (General settings, dangerous actions).
+
+### 4. Security & RBAC Enforcement
+- Implement a `require_workspace_role(allowed_roles)` FastAPI dependency.
+- Validate that the `current_user` belongs to the targeted `workspace_id` in every single API route.
+- Ensure tenant-safe queries (e.g., `where(Team.workspace_id == current_workspace.id)`).
+
+## User Review Required
+
+> [!WARNING]
+> **Database Migrations**
+> Modifying `MemberRole` enum in PostgreSQL can sometimes be tricky via Alembic (requiring dropping and recreating the type, or executing raw SQL `ALTER TYPE`). I will handle this safely using raw SQL in the Alembic revision. 
+> 
+> **Invitation System**
+> Since we do not have an active SMTP server configured for emails yet, the `POST /invites` endpoint will simulate the email and generate an invite link in the server logs for development testing.
+
+## Open Questions
+1. Does the proposed schema for Teams and Invitations align with your enterprise vision?
+2. Shall I proceed with scaffolding the backend models and generating the Alembic migration first?
+---
+
+---

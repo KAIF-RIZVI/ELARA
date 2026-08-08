@@ -1,0 +1,38 @@
+# Phase 7: GitHub Authentication & Token Encryption
+
+GitHub Authentication is **NOT** done yet! We currently only have standard Email & Password JWT authentication built. 
+
+To enable the backend to pull repositories securely, we must implement the GitHub OAuth2 flow. Furthermore, adhering to our Zero-Trust Security Review, we cannot store the resulting GitHub Access Token in plaintext in the PostgreSQL database.
+
+## User Review Required
+> [!IMPORTANT]
+> Because we are running locally without AWS KMS, I plan to implement **Symmetric Encryption (Fernet)** to encrypt the GitHub OAuth tokens before saving them to the database. The encryption key will be stored securely in your `.env` file. When you deploy to production, this encryption layer is easily swapped out for AWS KMS (BYOK).
+> 
+> Please review and approve this cryptographic approach to OAuth integration.
+
+## Proposed Changes
+
+### [MODIFY] `backend/app/models/project.py` (or Workspace)
+- We will add an `encrypted_github_token` column to the `Workspace` model. This allows the workspace to act on behalf of the connected GitHub organization to pull repositories.
+
+### [NEW] `backend/app/core/encryption.py`
+- Create an encryption service using the `cryptography` python package.
+- `encrypt(plaintext: str) -> str`
+- `decrypt(ciphertext: str) -> str`
+
+### [MODIFY] `backend/app/api/v1/endpoints/auth.py`
+We will expose two new endpoints:
+- `GET /auth/github/login`: Generates the OAuth URL and redirects the user to `github.com/login/oauth/authorize`.
+- `GET /auth/github/callback`: Handles the redirect back from GitHub.
+  - Exchanges the `code` for an `access_token` via the GitHub API.
+  - Encrypts the `access_token` using `encryption.py`.
+  - Saves the encrypted token into the current user's Workspace.
+
+### [MODIFY] `backend/app/worker/tasks/repo_tasks.py`
+- Update the Celery worker to fetch the encrypted token from PostgreSQL, decrypt it in volatile RAM, and pass it to the `GitHubService` so it can download private repositories securely.
+
+## Verification Plan
+1. We will verify the OAuth flow by hitting the `/auth/github/login` endpoint in the browser.
+2. We will check the PostgreSQL database to ensure the token is stored as unintelligible ciphertext.
+3. We will trigger the `/sync` API and ensure the worker can successfully decrypt the token and download a private repository.
+---
