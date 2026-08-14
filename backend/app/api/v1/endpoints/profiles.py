@@ -157,6 +157,18 @@ async def update_my_profile(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Developer profile not found"
         )
+        
+    # Log the activity
+    activity = ActivityLog(
+        workspace_id=None,
+        action="profile.updated",
+        target="Updated developer profile details",
+        status="success",
+        user_id=current_user.id
+    )
+    db.add(activity)
+    await db.commit()
+    
     return profile
 
 @router.get("/github/authorize")

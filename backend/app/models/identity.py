@@ -1,6 +1,6 @@
 import uuid
 import enum
-from sqlalchemy import String, Enum as SQLEnum, ForeignKey, DateTime
+from sqlalchemy import String, Enum as SQLEnum, ForeignKey, DateTime, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.base_model import AuditBase, WorkspaceEntityBase
 
@@ -21,6 +21,11 @@ class User(AuditBase):
 
 class OAuthAccount(AuditBase):
     __tablename__ = "oauth_accounts"
+    
+    __table_args__ = (
+        UniqueConstraint("provider", "provider_user_id", name="uq_oauth_provider_user_id"),
+        UniqueConstraint("user_id", "provider", name="uq_oauth_user_id_provider"),
+    )
     
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     provider: Mapped[str] = mapped_column(String, nullable=False, index=True) # "google", "github"
@@ -88,9 +93,10 @@ class WorkspaceInvitation(WorkspaceEntityBase):
     expires_at: Mapped[str | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # invited_by and invited_at are natively provided by AuditBase (created_by, created_at) inherited through WorkspaceEntityBase
 
-class APIKey(WorkspaceEntityBase):
+class APIKey(AuditBase):
     __tablename__ = "api_keys"
 
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
     key_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
     label: Mapped[str] = mapped_column(String, nullable=False)
     scopes: Mapped[str] = mapped_column(String, nullable=False)

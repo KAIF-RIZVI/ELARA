@@ -2,7 +2,7 @@ import uuid
 import enum
 from sqlalchemy import String, Enum as SQLEnum, ForeignKey, Integer, Text, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.core.base_model import WorkspaceEntityBase
+from app.core.base_model import AuditBase
 
 class BugSource(str, enum.Enum):
     MANUAL = "MANUAL"
@@ -23,7 +23,7 @@ class BugSeverity(str, enum.Enum):
     MEDIUM = "MEDIUM"
     LOW = "LOW"
 
-class Bug(WorkspaceEntityBase):
+class Bug(AuditBase):
     __tablename__ = "bugs"
 
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -42,7 +42,7 @@ class Bug(WorkspaceEntityBase):
     
     resolved_at: Mapped[str | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-class BugAttachment(WorkspaceEntityBase):
+class BugAttachment(AuditBase):
     __tablename__ = "bug_attachments"
 
     bug_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("bugs.id", ondelete="CASCADE"), nullable=False, index=True)

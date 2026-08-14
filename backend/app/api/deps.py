@@ -7,6 +7,7 @@ import jwt
 from app.core.database import get_db as db_get_db
 from app.core.security import decode_access_token
 from app.models.identity import User, WorkspaceMember, MemberRole
+from app.models.organization import OrganizationMember, OrganizationRole
 from app.services.user import user_service
 import uuid
 from sqlalchemy import select
@@ -86,6 +87,47 @@ class RequireRole:
             )
 
         if ROLE_HIERARCHY[member.role] < ROLE_HIERARCHY[self.required_role]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Requires {self.required_role} role or higher"
+            )
+
+        return member
+
+ORG_ROLE_HIERARCHY = {
+    OrganizationRole.OWNER: 60,
+    OrganizationRole.ADMIN: 50,
+    OrganizationRole.PROJECT_MANAGER: 40,
+    OrganizationRole.DEVELOPER: 30,
+    OrganizationRole.QA_ENGINEER: 20,
+    OrganizationRole.REPORTER: 10,
+    OrganizationRole.VIEWER: 0
+}
+
+class RequireOrganizationRole:
+    """
+    Dependency to enforce Enterprise Role-Based Access Control (RBAC).
+    Requires an `organization_id` path parameter or query parameter.
+    """
+    def __init__(self, required_role: OrganizationRole):
+        self.required_role = required_role
+
+    async def __call__(self, organization_id: uuid.UUID, db: SessionDep, current_user: CurrentUser):
+        stmt = select(OrganizationMember).where(
+            OrganizationMember.organization_id == organization_id,
+            OrganizationMember.user_id == current_user.id,
+            OrganizationMember.status == "ACTIVE"
+        )
+        result = await db.execute(stmt)
+        member = result.scalar_one_or_none()
+
+        if not member:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not a member of this organization"
+            )
+
+        if ORG_ROLE_HIERARCHY[member.role] < ORG_ROLE_HIERARCHY[self.required_role]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Requires {self.required_role} role or higher"

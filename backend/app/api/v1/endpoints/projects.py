@@ -3,22 +3,23 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 import uuid
 
-from app.api.deps import SessionDep, CurrentUser, RequireRole
+from app.api.deps import SessionDep, CurrentUser, RequireOrganizationRole
 from app.schemas.project import ProjectCreate, ProjectResponse, ProjectUpdate
-from app.models.identity import WorkspaceMember, MemberRole, User
+from app.models.organization import OrganizationMember, OrganizationRole
+from app.models.identity import User
 from app.models.project import Project, Repository
 
 router = APIRouter()
 
 @router.post("", response_model=ProjectResponse)
 async def create_project(
-    workspace_id: uuid.UUID,
+    organization_id: uuid.UUID,
     project_in: ProjectCreate,
     db: SessionDep,
-    member: WorkspaceMember = Depends(RequireRole(MemberRole.ADMIN))
+    member: OrganizationMember = Depends(RequireOrganizationRole(OrganizationRole.ADMIN))
 ):
     project = Project(
-        workspace_id=workspace_id,
+        organization_id=organization_id,
         name=project_in.name,
         description=project_in.description,
         status=project_in.status,
@@ -31,11 +32,11 @@ async def create_project(
 
 @router.get("", response_model=list[ProjectResponse])
 async def list_projects(
-    workspace_id: uuid.UUID,
+    organization_id: uuid.UUID,
     db: SessionDep,
-    member: WorkspaceMember = Depends(RequireRole(MemberRole.VIEWER))
+    member: OrganizationMember = Depends(RequireOrganizationRole(OrganizationRole.VIEWER))
 ):
-    stmt = select(Project).where(Project.workspace_id == workspace_id)
+    stmt = select(Project).where(Project.organization_id == organization_id)
     projects = (await db.execute(stmt)).scalars().all()
     
     response = []
@@ -58,13 +59,13 @@ async def list_projects(
 
 @router.put("/{project_id}", response_model=ProjectResponse)
 async def update_project(
-    workspace_id: uuid.UUID,
+    organization_id: uuid.UUID,
     project_id: uuid.UUID,
     update_in: ProjectUpdate,
     db: SessionDep,
-    member: WorkspaceMember = Depends(RequireRole(MemberRole.ADMIN))
+    member: OrganizationMember = Depends(RequireOrganizationRole(OrganizationRole.PROJECT_MANAGER))
 ):
-    stmt = select(Project).where(Project.workspace_id == workspace_id, Project.id == project_id)
+    stmt = select(Project).where(Project.organization_id == organization_id, Project.id == project_id)
     project = (await db.execute(stmt)).scalar_one_or_none()
     
     if not project:
@@ -83,12 +84,12 @@ async def update_project(
 
 @router.delete("/{project_id}")
 async def delete_project(
-    workspace_id: uuid.UUID,
+    organization_id: uuid.UUID,
     project_id: uuid.UUID,
     db: SessionDep,
-    member: WorkspaceMember = Depends(RequireRole(MemberRole.ADMIN))
+    member: OrganizationMember = Depends(RequireOrganizationRole(OrganizationRole.ADMIN))
 ):
-    stmt = select(Project).where(Project.workspace_id == workspace_id, Project.id == project_id)
+    stmt = select(Project).where(Project.organization_id == organization_id, Project.id == project_id)
     project = (await db.execute(stmt)).scalar_one_or_none()
     
     if not project:

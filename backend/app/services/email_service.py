@@ -86,6 +86,28 @@ class EmailService:
         html_content = self._get_reset_template(name, link)
         return await self.provider.send_email(to_email, "Reset your ELARA password", html_content)
 
+    def _get_org_invite_template(self, org_name: str, link: str) -> str:
+        return f"""
+        <html>
+            <body style="font-family: sans-serif; background-color: #09090b; color: #fff; padding: 40px; margin: 0;">
+                <div style="max-width: 600px; margin: 0 auto; background-color: #18181b; padding: 40px; border-radius: 8px; border: 1px solid #27272a;">
+                    <h1 style="color: #fff; margin-top: 0;">You've been invited to {org_name}</h1>
+                    <p style="color: #a1a1aa; font-size: 16px; line-height: 1.5;">You have been invited to join the <strong>{org_name}</strong> organization on ELARA.</p>
+                    <br>
+                    <a href="{link}" style="display: inline-block; background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Accept Invitation</a>
+                    <br><br><br>
+                    <p style="color: #71717a; font-size: 14px;">If you didn't expect this invitation, you can safely ignore this email.</p>
+                </div>
+            </body>
+        </html>
+        """
+
+    async def send_organization_invitation_email(self, to_email: str, org_name: str, token: str) -> bool:
+        link = f"http://localhost:3000/organizations/invite/{token}"
+        html_content = self._get_org_invite_template(org_name, link)
+        return await self.provider.send_email(to_email, f"Invitation to join {org_name} on ELARA", html_content)
+
 # Initialize the concrete provider
 _provider = SmtpEmailProvider()
 email_service = EmailService(provider=_provider)
+

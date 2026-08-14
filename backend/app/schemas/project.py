@@ -18,7 +18,7 @@ class ProjectUpdate(BaseModel):
 
 class ProjectResponse(ProjectBase):
     id: uuid.UUID
-    workspace_id: uuid.UUID
+    organization_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
     

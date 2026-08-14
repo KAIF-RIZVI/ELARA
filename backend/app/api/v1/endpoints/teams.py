@@ -3,22 +3,23 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 import uuid
 
-from app.api.deps import SessionDep, CurrentUser, RequireRole
+from app.api.deps import SessionDep, CurrentUser, RequireOrganizationRole
 from app.schemas.team import TeamCreate, TeamResponse, TeamUpdate
-from app.models.identity import WorkspaceMember, MemberRole, User
+from app.models.organization import OrganizationMember, OrganizationRole
+from app.models.identity import User
 from app.models.team import Team, TeamMember
 
 router = APIRouter()
 
 @router.post("", response_model=TeamResponse)
 async def create_team(
-    workspace_id: uuid.UUID,
+    organization_id: uuid.UUID,
     team_in: TeamCreate,
     db: SessionDep,
-    member: WorkspaceMember = Depends(RequireRole(MemberRole.ADMIN))
+    member: OrganizationMember = Depends(RequireOrganizationRole(OrganizationRole.ADMIN))
 ):
     team = Team(
-        workspace_id=workspace_id,
+        organization_id=organization_id,
         name=team_in.name,
         description=team_in.description,
         created_by=member.user_id
@@ -30,11 +31,11 @@ async def create_team(
 
 @router.get("", response_model=list[TeamResponse])
 async def list_teams(
-    workspace_id: uuid.UUID,
+    organization_id: uuid.UUID,
     db: SessionDep,
-    member: WorkspaceMember = Depends(RequireRole(MemberRole.VIEWER))
+    member: OrganizationMember = Depends(RequireOrganizationRole(OrganizationRole.VIEWER))
 ):
-    stmt = select(Team).where(Team.workspace_id == workspace_id)
+    stmt = select(Team).where(Team.organization_id == organization_id)
     teams = (await db.execute(stmt)).scalars().all()
     
     response = []
@@ -57,12 +58,12 @@ async def list_teams(
 
 @router.delete("/{team_id}")
 async def delete_team(
-    workspace_id: uuid.UUID,
+    organization_id: uuid.UUID,
     team_id: uuid.UUID,
     db: SessionDep,
-    member: WorkspaceMember = Depends(RequireRole(MemberRole.ADMIN))
+    member: OrganizationMember = Depends(RequireOrganizationRole(OrganizationRole.ADMIN))
 ):
-    stmt = select(Team).where(Team.workspace_id == workspace_id, Team.id == team_id)
+    stmt = select(Team).where(Team.organization_id == organization_id, Team.id == team_id)
     team = (await db.execute(stmt)).scalar_one_or_none()
     
     if not team:

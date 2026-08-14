@@ -28,6 +28,5 @@ class WorkspaceResponse(WorkspaceBase):
 
 class WorkspaceOverview(WorkspaceResponse):
     members_count: int = 0
-    projects_count: int = 0
     repositories_count: int = 0
     ai_credits_remaining: int = 0

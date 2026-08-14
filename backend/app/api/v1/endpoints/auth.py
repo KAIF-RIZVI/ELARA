@@ -143,6 +143,12 @@ async def google_callback(request: Request, response: Response, db: SessionDep, 
         user = await user_service.repository.get_by_email(db, google_email)
         if user:
             from app.models.identity import OAuthAccount
+            from sqlalchemy import select
+            
+            existing_google_result = await db.execute(select(OAuthAccount).where(OAuthAccount.user_id == user.id, OAuthAccount.provider == "google"))
+            if existing_google_result.scalar_one_or_none():
+                raise HTTPException(status_code=409, detail="This ELARA account is already linked to a different Google account.")
+                
             oauth_account = OAuthAccount(
                 user_id=user.id,
                 provider="google",

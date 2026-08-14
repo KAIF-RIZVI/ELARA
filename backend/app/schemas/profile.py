@@ -93,3 +93,25 @@ class EnterpriseProfileResponse(BaseModel):
     account: AccountInfo
     connected_accounts: ConnectedAccounts
     stats: QuickStats
+
+class PublicProfileResponse(BaseModel):
+    user_id: uuid.UUID
+    full_name: str | None = None
+    avatar_url: str | None = None
+    organization_role: str | None = None
+    developer_title: str | None = None
+    bio: str | None = None
+    location: str | None = None
+    timezone: str | None = None
+    skills: dict[str, Any] | None = None
+    github_username: str | None = None
+    repositories_connected: int = 0
+    projects_participated: int = 0
+    assigned_bugs: int = 0
+    resolved_bugs: int = 0
+    developer_score: int = 0
+    joined_at: str | None = None
+    last_active: str | None = None
+    availability_status: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)

@@ -16,7 +16,7 @@ class TeamUpdate(BaseModel):
 
 class TeamResponse(TeamBase):
     id: uuid.UUID
-    workspace_id: uuid.UUID
+    organization_id: uuid.UUID
     lead_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
