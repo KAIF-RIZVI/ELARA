@@ -1,13 +1,16 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import auth, workspaces, bugs, repositories, users, dashboard, profiles, members, teams, projects, organizations, search, notifications
+from app.api.v1.endpoints import auth, workspaces, bugs, repositories, users, dashboard, profiles, members, teams, projects, organizations, search, notifications, indexing, github, ai, api_keys, intake
 
 api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(organizations.router, prefix="/organizations", tags=["organizations"])
 api_router.include_router(workspaces.router, prefix="/workspaces", tags=["workspaces"])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
-api_router.include_router(bugs.router, prefix="/bugs", tags=["bugs"])
+api_router.include_router(bugs.router, prefix="/workspaces/{workspace_id}/bugs", tags=["bugs"])
+api_router.include_router(api_keys.router, prefix="/workspaces/{workspace_id}/api-keys", tags=["api_keys"])
 api_router.include_router(repositories.router, prefix="/repositories", tags=["repositories"])
+api_router.include_router(github.router, prefix="/github", tags=["github"])
+api_router.include_router(indexing.router, prefix="/indexing", tags=["indexing"])
 api_router.include_router(users.router, prefix="/users", tags=["users"])
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
 api_router.include_router(profiles.router, prefix="/profiles", tags=["profiles"])
@@ -15,3 +18,5 @@ api_router.include_router(members.router, prefix="/workspaces/{workspace_id}/mem
 api_router.include_router(teams.router, prefix="/workspaces/{workspace_id}/teams", tags=["teams"])
 api_router.include_router(projects.router, prefix="/workspaces/{workspace_id}/projects", tags=["projects"])
 api_router.include_router(search.router, prefix="/search", tags=["search"])
+api_router.include_router(ai.router, prefix="/ai", tags=["ai"])
+api_router.include_router(intake.router, prefix="/intake", tags=["intake"])

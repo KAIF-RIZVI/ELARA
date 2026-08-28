@@ -1,0 +1,35 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: qdrant-private-access
+  namespace: elara-qdrant
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: qdrant
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow P2P traffic between Qdrant nodes for clustering
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: qdrant
+      ports:
+        - protocol: TCP
+          port: 6335 # P2P Port
+        - protocol: TCP
+          port: 6334 # gRPC
+    # Allow traffic ONLY from ELARA Backend
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: elara-backend # Assuming backend is in this namespace
+          podSelector:
+            matchLabels:
+              app: elara-backend
+      ports:
+        - protocol: TCP
+          port: 6334 # gRPC (preferred for backend)
+        - protocol: TCP
+          port: 6333 # REST (if needed)

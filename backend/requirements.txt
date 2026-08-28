@@ -13,3 +13,21 @@ python-multipart==0.0.9
 aiosmtplib==3.0.1
 passlib[argon2]==1.7.4
 argon2-cffi==23.1.0
+
+# AI / Indexing Dependencies
+tree-sitter==0.21.3
+tree-sitter-python
+tree-sitter-javascript
+tree-sitter-typescript
+tree-sitter-java
+tree-sitter-c
+tree-sitter-cpp
+tree-sitter-c-sharp
+tree-sitter-go
+tree-sitter-rust
+tree-sitter-php
+tree-sitter-kotlin
+tree-sitter-swift
+qdrant-client==1.9.1
+transformers
+torchaiofiles==24.1.0

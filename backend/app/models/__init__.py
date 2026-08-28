@@ -1,10 +1,10 @@
 from app.core.base_model import Base
 
 from app.models.ai import RecStatus, Recommendation, RecommendationCandidate, Explanation, AssignStatus, Assignment
-from app.models.bug import BugSource, BugState, BugSeverity, Bug, BugAttachment
+from app.models.bug import BugSource, BugState, BugSeverity, Bug, BugAttachment, BugAssignment, BugComment, IdempotencyKey
 from app.models.developer import DeveloperProfile, ExpertiseScore
 from app.models.identity import User, OAuthAccount, UserSession, MemberRole, MemberStatus, WorkspaceMember, InvitationStatus, WorkspaceInvitation, APIKey
-from app.models.integrations import Integration
+from app.models.integrations import Integration, GitHubIntegration, IntegrationStatus
 from app.models.organization import (
     Organization,
     OrganizationStatus,
@@ -25,10 +25,10 @@ from app.models.workspace import WorkspaceStatus, Workspace, PlanTier, Subscript
 __all__ = [
     "Base",
     "RecStatus", "Recommendation", "RecommendationCandidate", "Explanation", "AssignStatus", "Assignment",
-    "BugSource", "BugState", "BugSeverity", "Bug", "BugAttachment",
+    "BugSource", "BugState", "BugSeverity", "Bug", "BugAttachment", "BugAssignment", "BugComment", "IdempotencyKey",
     "DeveloperProfile", "ExpertiseScore",
     "User", "OAuthAccount", "UserSession", "MemberRole", "MemberStatus", "WorkspaceMember", "InvitationStatus", "WorkspaceInvitation", "APIKey",
-    "Integration",
+    "Integration", "GitHubIntegration", "IntegrationStatus",
     "Organization", "OrganizationStatus", "OrganizationRole", "OrganizationMember", "OrganizationInvitation", "OrganizationInvitationStatus", "OrganizationSettings", "OrganizationSubscription", "OrganizationAuditLog",
     "UserPreference", "UserOnboarding",
     "ProjectStatus", "Project", "SyncStatus", "Repository", "JobStatus", "RepoIndexJob",

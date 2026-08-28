@@ -14,6 +14,14 @@ class EmailProvider(abc.ABC):
 
 class SmtpEmailProvider(EmailProvider):
     async def send_email(self, to_email: str, subject: str, html_content: str) -> bool:
+        # In development, always print the link to the console as a fallback
+        if "localhost" in html_content:
+            link_start = html_content.find('href="') + 6
+            link_end = html_content.find('"', link_start)
+            if link_start > 5 and link_end > link_start:
+                extracted_link = html_content[link_start:link_end]
+                logger.warning(f"DEVELOPMENT MODE: Click this link to continue: {extracted_link}")
+
         if not settings.SMTP_HOST or not settings.SMTP_USERNAME:
             logger.error("SMTP configuration is missing. Cannot send email.")
             return False

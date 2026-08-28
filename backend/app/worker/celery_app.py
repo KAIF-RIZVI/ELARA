@@ -2,6 +2,7 @@ from celery import Celery
 from app.core.config import get_settings
 
 settings = get_settings()
+settings.validate_production_qdrant()
 
 celery_app = Celery(
     "elara_worker",
@@ -21,3 +22,14 @@ celery_app.conf.update(
 
 # Autodiscover tasks in the tasks module
 celery_app.autodiscover_tasks(["app.worker"])
+
+import app.worker.tasks.org_tasks
+
+from celery.schedules import crontab
+
+celery_app.conf.beat_schedule = {
+    "cleanup-stale-workspaces-every-hour": {
+        "task": "cleanup_stale_workspaces",
+        "schedule": crontab(minute=0, hour="*"),
+    },
+}

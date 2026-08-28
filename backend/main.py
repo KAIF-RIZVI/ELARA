@@ -4,6 +4,7 @@ from app.api.v1.api import api_router
 from app.core.config import get_settings
 
 settings = get_settings()
+settings.validate_production_qdrant()
 
 app = FastAPI(
     title="ELARA API",

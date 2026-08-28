@@ -15,6 +15,8 @@ class Workspace(AuditBase):
 
     name: Mapped[str] = mapped_column(String, nullable=False)
     slug: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, unique=True, index=True)
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
     status: Mapped[WorkspaceStatus] = mapped_column(SQLEnum(WorkspaceStatus), default=WorkspaceStatus.ACTIVE, nullable=False)
     settings: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
@@ -51,8 +53,11 @@ class ActivityLog(AuditBase):
     __tablename__ = "activity_logs"
 
     workspace_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True, index=True)
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True)
+    bug_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("bugs.id", ondelete="CASCADE"), nullable=True, index=True)
 
     action: Mapped[str] = mapped_column(String, nullable=False) # e.g. "bug.fixed", "repo.connected"
     target: Mapped[str] = mapped_column(String, nullable=False) # e.g. "auth-service crash on startup"
     status: Mapped[str] = mapped_column(String, nullable=False) # "success", "info", "warning"
     user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    metadata_payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)

@@ -31,11 +31,15 @@ class OrganizationUpdate(BaseModel):
     company_size: Optional[str] = None
     country: Optional[str] = None
     timezone: Optional[str] = None
+    discoverable: Optional[bool] = None
+    join_policy: Optional[JoinPolicy] = None
 
 class OrganizationResponse(OrganizationBase):
     id: uuid.UUID
     owner_id: uuid.UUID
     status: OrganizationStatus
+    discoverable: bool
+    join_policy: JoinPolicy
     created_at: datetime
     updated_at: datetime
 

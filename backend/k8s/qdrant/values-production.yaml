@@ -1,0 +1,113 @@
+# elara-qdrant-values.yaml
+# Production Configuration for Qdrant Kubernetes Deployment
+# Helm Chart: qdrant/qdrant
+
+replicaCount: 3
+
+image:
+  repository: qdrant/qdrant
+  tag: v1.9.2  # Pinned production version (matches qdrant-client==1.9.1)
+  pullPolicy: IfNotPresent
+
+config:
+  cluster:
+    enabled: true
+    p2p:
+      port: 6335
+  storage:
+    storage_path: /qdrant/storage
+    on_disk_payload: true
+    wal:
+      wal_capacity_mb: 32
+  tls:
+    cert: /qdrant/tls/tls.crt
+    key: /qdrant/tls/tls.key
+    ca_cert: /qdrant/tls/ca.crt
+  service:
+    enable_tls: true # Native Qdrant TLS is required
+    host: 0.0.0.0
+    grpc_port: 6334
+    http_port: 6333
+    enable_cors: false # Disable CORS as frontend never accesses directly
+
+# Secret for API key injection and TLS Configuration
+env:
+  - name: QDRANT__SERVICE__API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: qdrant-production-secrets
+        key: api-key
+  - name: QDRANT__TLS__CERT
+    value: /qdrant/tls/tls.crt
+  - name: QDRANT__TLS__KEY
+    value: /qdrant/tls/tls.key
+  - name: QDRANT__TLS__CA_CERT
+    value: /qdrant/tls/ca.crt
+  - name: QDRANT__CLUSTER__P2P__ENABLE_TLS
+    value: "true"
+
+extraVolumes:
+  - name: qdrant-tls-volume
+    secret:
+      secretName: qdrant-tls-secret
+
+extraVolumeMounts:
+  - name: qdrant-tls-volume
+    mountPath: /qdrant/tls
+    readOnly: true
+
+resources:
+  requests:
+    cpu: "2"
+    memory: "8Gi"
+  limits:
+    cpu: "4"
+    memory: "16Gi"
+
+persistence:
+  enabled: true
+  size: 50Gi
+  accessModes:
+    - ReadWriteOnce
+  # StorageClass MUST be explicitly provided via helm override (--set persistence.storageClassName=...)
+  # Do not deploy until the actual StorageClass has been verified to be SSD/NVMe!
+  # storageClassName: "gp3"
+
+# Health Checks
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /readyz
+    port: 6333
+  initialDelaySeconds: 15
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /readyz
+    port: 6333
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  successThreshold: 1
+  failureThreshold: 3
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true # Integrates with Prometheus Operator
+
+# Anti-affinity to ensure nodes are scheduled on different physical hosts
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+                - qdrant
+        topologyKey: "kubernetes.io/hostname"

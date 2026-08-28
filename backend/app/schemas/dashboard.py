@@ -12,6 +12,7 @@ class OrganizationDashboardStats(BaseModel):
     repositories_indexed: int
     bugs_open: int
     bugs_critical: int
+    ai_credits: int
 
 class DashboardProject(BaseModel):
     id: uuid.UUID

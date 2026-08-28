@@ -1,10 +1,15 @@
 import asyncio
+import os
+import shutil
 import uuid
+import logging
 from app.worker.celery_app import celery_app
-from app.services.github_service import github_service
-from app.ai.ast_parser import ast_parser
-from app.ai.vector_store import vector_store
-from app.ai.embeddings import embedding_service
+from app.core.database import AsyncSessionLocal as SessionLocal
+from app.services.repository_processor import repository_processor
+from app.services.repository_indexing import repository_indexing_service
+from app.models.project import JobStatus
+
+logger = logging.getLogger(__name__)
 
 def _run_async(coro):
     try:
@@ -14,51 +19,48 @@ def _run_async(coro):
         asyncio.set_event_loop(loop)
     return loop.run_until_complete(coro)
 
+@celery_app.task(name="index_repository_job")
+def index_repository_job(job_id_str: str, organization_id_str: str):
+    """
+    Background task to securely process and index a repository.
+    Enforces Layer 1 Cleanup (try/finally).
+    """
+    job_id = uuid.UUID(job_id_str)
+    organization_id = uuid.UUID(organization_id_str)
+    workspace_dir = f"/tmp/elara/indexing/{job_id}/"
+    
+    logger.info(f"Starting ephemeral indexing job {job_id} for organization {organization_id}")
+    
+    async def _execute():
+        async with SessionLocal() as db:
+            try:
+                await repository_processor.process_job(db, job_id, organization_id)
+            except Exception as e:
+                import traceback
+                logger.error(f"Job {job_id} failed with error: {e}")
+                logger.error(traceback.format_exc())
+                # Ensure status is FAILED if it bubbled up without being caught
+                job = await repository_indexing_service.get_job(db, job_id, organization_id)
+                if job and job.status not in [JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED]:
+                    await repository_indexing_service.update_job_status(db, job_id, JobStatus.FAILED, error="Unhandled worker exception", error_code="WORKER_CRASH")
+
+    try:
+        _run_async(_execute())
+    finally:
+        # Layer 1 Cleanup Guarantee: Delete the ephemeral workspace
+        if os.path.exists(workspace_dir):
+            try:
+                shutil.rmtree(workspace_dir)
+                logger.info(f"Successfully cleaned up ephemeral workspace: {workspace_dir}")
+            except Exception as cleanup_err:
+                logger.error(f"Failed to clean up workspace {workspace_dir}: {cleanup_err}")
+
+    return {"status": "FINISHED", "job_id": str(job_id)}
+
 @celery_app.task(name="sync_repository_task")
-def sync_repository_task(repository_id: str, workspace_id: str):
+def sync_repository_task(repository_id: str, workspace_id: str = None, organization_id: str = None):
     """
-    Background task to sync a repository from GitHub.
+    Deprecated compatibility wrapper for existing frontend workflows.
+    In a real scenario, this delegates to the new endpoint logic.
     """
-    print(f"Starting zero-trust sync for repository {repository_id} in workspace {workspace_id}")
-    
-    # In a real app, we'd fetch the repo full_name and access_token from DB using repository_id
-    # For now, we mock fetching a small public repo.
-    repo_full_name = "jina-ai/jina"  # Placeholder public repo
-    access_token = None
-    
-    # 1. Download to memory
-    files_dict = _run_async(github_service.download_repo_to_memory(repo_full_name, access_token))
-    
-    # 2. AST Parsing
-    all_chunks = []
-    for file_path, source_code in files_dict.items():
-        try:
-            chunks = ast_parser.chunk_code(source_code, file_path)
-            all_chunks.extend(chunks)
-        except Exception as e:
-            print(f"Error parsing {file_path}: {e}")
-            
-    print(f"Total chunks extracted: {len(all_chunks)}")
-    
-    # 3. Vector Embeddings
-    points = []
-    for chunk in all_chunks:
-        vector = embedding_service.embed_text(chunk["text"])
-        points.append({
-            "id": str(uuid.uuid4()),
-            "vector": vector, 
-            "payload": {
-                "file_path": chunk["text"].split("\n")[0].replace("File: ", ""),
-                "type": chunk["type"],
-                # Note: In production, text would be encrypted with BYOK KMS before payload insertion
-                "text": chunk["text"]
-            }
-        })
-        
-    # 4. Upsert to Qdrant
-    if points:
-        vector_store.upsert_vectors(workspace_id, repository_id, points)
-        print(f"Successfully upserted {len(points)} vectors to Qdrant.")
-    
-    # 5. Volatile RAM is automatically garbage collected here.
-    return {"status": "SUCCESS", "repository_id": repository_id, "chunks": len(all_chunks)}
+    pass

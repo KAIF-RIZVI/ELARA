@@ -121,7 +121,10 @@ async def google_callback(request: Request, response: Response, db: SessionDep, 
     try:
         # verify_oauth2_token verifies signature, audience (aud), expiration (exp), and issuer (iss)
         id_info = id_token.verify_oauth2_token(
-            id_token_jwt, google_requests.Request(), settings.GOOGLE_CLIENT_ID
+            id_token_jwt, 
+            google_requests.Request(), 
+            settings.GOOGLE_CLIENT_ID,
+            clock_skew_in_seconds=10
         )
     except ValueError as e:
         logger.error(f"ID Token validation failed: {str(e)}")
@@ -187,7 +190,7 @@ async def google_callback(request: Request, response: Response, db: SessionDep, 
     # 6. Set HttpOnly Cookies and clear OAuth temp cookies
     is_prod = settings.ENVIRONMENT == "production"
     res = RedirectResponse(url="http://localhost:3000/dashboard", status_code=status.HTTP_302_FOUND)
-    res.set_cookie(key="access_token", value=access_token, httponly=True, secure=is_prod, samesite="lax", max_age=900)
+    res.set_cookie(key="access_token", value=access_token, httponly=True, secure=is_prod, samesite="lax", max_age=21600)
     res.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=is_prod, samesite="lax", max_age=604800)
     res.delete_cookie("oauth_state")
     res.delete_cookie("oauth_verifier")
@@ -212,7 +215,7 @@ async def register_user(request: Request, user_in: UserCreate, db: SessionDep):
     try:
         user = await user_service.create_user(
             db, 
-            email=user_in.email, 
+            email=user_in.email.lower(), 
             full_name=user_in.full_name, 
             password=user_in.password,
             auth_provider="email",
@@ -255,7 +258,7 @@ async def login_access_token(
     from app.repositories.user import user as user_repo
     from app.core.security import verify_password
     
-    user = await user_repo.get_by_email(db, email=form_data.username)
+    user = await user_repo.get_by_email(db, email=form_data.username.lower())
     if not user or not user.password_hash:
         raise HTTPException(status_code=400, detail="Incorrect email or password")
     if not verify_password(form_data.password, user.password_hash):
@@ -275,7 +278,7 @@ async def login_access_token(
     access_token = create_access_token(subject=user.id, session_id=session.id)
     
     is_prod = settings.ENVIRONMENT == "production"
-    response.set_cookie(key="access_token", value=access_token, httponly=True, secure=is_prod, samesite="lax", max_age=900)
+    response.set_cookie(key="access_token", value=access_token, httponly=True, secure=is_prod, samesite="lax", max_age=21600)
     response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=is_prod, samesite="lax", max_age=604800)
     
     # Audit Logging for SOC 2
@@ -296,25 +299,27 @@ async def refresh_token(request: Request, response: Response, db: SessionDep):
     if not token:
         raise HTTPException(status_code=401, detail="Refresh token missing")
         
-    # We would also extract the session_id from the expired access_token's unverified payload to look it up.
     old_access = request.cookies.get("access_token")
     session_id = None
     if old_access:
         import jwt
         try:
             unverified = jwt.decode(old_access, options={"verify_signature": False})
-            session_id = unverified.get("sid")
+            if "sid" in unverified:
+                import uuid
+                session_id = uuid.UUID(unverified.get("sid"))
         except Exception:
             pass
             
-    if not session_id:
-        raise HTTPException(status_code=401, detail="Could not determine session ID")
-    
     try:
-        new_access, new_refresh = await session_service.rotate_refresh_token(db, session_id, token)
+        new_access, new_refresh = await session_service.rotate_refresh_token(
+            db, 
+            plain_refresh_token=token, 
+            session_id=session_id
+        )
         
         is_prod = settings.ENVIRONMENT == "production"
-        response.set_cookie(key="access_token", value=new_access, httponly=True, secure=is_prod, samesite="lax", max_age=900)
+        response.set_cookie(key="access_token", value=new_access, httponly=True, secure=is_prod, samesite="lax", max_age=21600)
         response.set_cookie(key="refresh_token", value=new_refresh, httponly=True, secure=is_prod, samesite="lax", max_age=604800)
         
         return {"message": "Tokens rotated"}
@@ -398,7 +403,7 @@ class EmailRequest(BaseModel):
 async def resend_verification(request: Request, body: EmailRequest, db: SessionDep):
     from app.repositories.user import user as user_repo
     
-    user = await user_repo.get_by_email(db, email=body.email)
+    user = await user_repo.get_by_email(db, email=body.email.lower())
     if not user or user.email_verified:
         # Return success even if invalid to prevent email enumeration
         return {"message": "If your email is unregistered or unverified, a new link has been sent."}
@@ -427,7 +432,7 @@ async def resend_verification(request: Request, body: EmailRequest, db: SessionD
 async def forgot_password(request: Request, body: EmailRequest, db: SessionDep):
     from app.repositories.user import user as user_repo
     
-    user = await user_repo.get_by_email(db, email=body.email)
+    user = await user_repo.get_by_email(db, email=body.email.lower())
     if not user:
         # Prevent email enumeration
         return {"message": "If that email exists, a password reset link has been sent."}

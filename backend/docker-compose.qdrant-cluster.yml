@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  qdrant-node-1:
+    image: qdrant/qdrant:v1.9.0
+    container_name: elara-qdrant-node-1
+    environment:
+      - QDRANT__SERVICE__API_KEY=elara-production-test-key
+      - QDRANT__CLUSTER__ENABLED=true
+      - QDRANT__CLUSTER__P2P__PORT=6335
+    ports:
+      - "7333:6333" # Only expose node 1 HTTP for backend connection locally (7333 to avoid conflict with v2 on 6333)
+      - "7334:6334" # gRPC
+    volumes:
+      - qdrant_prod_storage_1:/qdrant/storage
+    command: ./qdrant --uri 'http://qdrant-node-2:6335'
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 4G
+    networks:
+      - qdrant-prod-net
+
+  qdrant-node-2:
+    image: qdrant/qdrant:v1.9.0
+    container_name: elara-qdrant-node-2
+    environment:
+      - QDRANT__SERVICE__API_KEY=elara-production-test-key
+      - QDRANT__CLUSTER__ENABLED=true
+      - QDRANT__CLUSTER__P2P__PORT=6335
+    volumes:
+      - qdrant_prod_storage_2:/qdrant/storage
+    command: ./qdrant --uri 'http://qdrant-node-1:6335'
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 4G
+    networks:
+      - qdrant-prod-net
+
+  qdrant-node-3:
+    image: qdrant/qdrant:v1.9.0
+    container_name: elara-qdrant-node-3
+    environment:
+      - QDRANT__SERVICE__API_KEY=elara-production-test-key
+      - QDRANT__CLUSTER__ENABLED=true
+      - QDRANT__CLUSTER__P2P__PORT=6335
+    volumes:
+      - qdrant_prod_storage_3:/qdrant/storage
+    command: ./qdrant --uri 'http://qdrant-node-1:6335'
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 4G
+    networks:
+      - qdrant-prod-net
+
+volumes:
+  qdrant_prod_storage_1:
+  qdrant_prod_storage_2:
+  qdrant_prod_storage_3:
+
+networks:
+  qdrant-prod-net:
+    driver: bridge

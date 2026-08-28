@@ -32,13 +32,19 @@ class SessionService:
         
         return session, plain_refresh_token
         
-    async def rotate_refresh_token(self, db: AsyncSession, session_id: uuid.UUID, plain_refresh_token: str) -> tuple[str, str]:
+    async def rotate_refresh_token(self, db: AsyncSession, plain_refresh_token: str, session_id: uuid.UUID | None = None) -> tuple[str, str]:
         """
         Validates the incoming refresh token. If valid, burns the old one, generates a new one, and issues a new JWT.
         Implements strict rotation and family tracking (theft detection).
         Returns (new_jwt_access_token, new_plain_refresh_token)
         """
-        result = await db.execute(select(UserSession).where(UserSession.id == session_id))
+        if session_id:
+            stmt = select(UserSession).where(UserSession.id == session_id)
+        else:
+            token_hash = get_refresh_token_hash(plain_refresh_token)
+            stmt = select(UserSession).where(UserSession.refresh_token_hash == token_hash)
+            
+        result = await db.execute(stmt)
         session = result.scalar_one_or_none()
         
         if not session:

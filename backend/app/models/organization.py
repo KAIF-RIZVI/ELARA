@@ -15,6 +15,7 @@ class OrganizationStatus(str, enum.Enum):
     EXPIRED = "EXPIRED"
     ARCHIVED = "ARCHIVED"
     DELETED = "DELETED"
+    DELETING = "DELETING"
 
 class OrganizationRole(str, enum.Enum):
     OWNER = "OWNER"

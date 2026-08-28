@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     # Security
     JWT_SECRET_KEY: str = "change_me_in_production"
     JWT_ALGORITHM: str = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 360
     
     # Postgres Database
     POSTGRES_HOST: str = "localhost"
@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     
     # Qdrant
     QDRANT_URL: str = "http://localhost:6333"
+    QDRANT_API_KEY: str | None = None
     
     # External Integrations (Optional)
     GOOGLE_CLIENT_ID: str | None = None
@@ -38,10 +39,25 @@ class Settings(BaseSettings):
     GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/google/callback"
     GITHUB_CLIENT_ID: str | None = None
     GITHUB_CLIENT_SECRET: str | None = None
+    
+    # GitHub App Integration
+    GITHUB_APP_ID: str | None = None
+    GITHUB_APP_PRIVATE_KEY: str | None = None
+    GITHUB_WEBHOOK_SECRET: str | None = None
+    GITHUB_DEV_PAT_ENABLED: bool = False
+    
+    # LLM Integration
+    OPENAI_API_KEY: str | None = None
+    LLM_MODEL: str = "gpt-4o"
+    LLM_TIMEOUT: float = 30.0
     AWS_ACCESS_KEY_ID: str | None = None
     AWS_SECRET_ACCESS_KEY: str | None = None
     AWS_REGION: str = "ap-south-1"
     S3_BUCKET_NAME: str | None = None
+    
+    # Storage Backend
+    STORAGE_BACKEND: str = "local" # options: "local", "s3"
+    LOCAL_STORAGE_DIR: str = "./local_storage"
     
     # Email & SMTP
     SMTP_HOST: str | None = None
@@ -56,6 +72,13 @@ class Settings(BaseSettings):
             return self.DATABASE_URL
         encoded_password = quote_plus(self.POSTGRES_PASSWORD) if self.POSTGRES_PASSWORD else ""
         return f"postgresql+asyncpg://{self.POSTGRES_USER}:{encoded_password}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        
+    def validate_production_qdrant(self):
+        if self.ENVIRONMENT == "production":
+            if not self.QDRANT_URL or "localhost" in self.QDRANT_URL:
+                raise ValueError("CRITICAL SECURITY: QDRANT_URL is missing or set to localhost in production.")
+            if not self.QDRANT_API_KEY:
+                raise ValueError("CRITICAL SECURITY: QDRANT_API_KEY is missing in production. Qdrant Cloud requires API key authentication.")
 
     model_config = SettingsConfigDict(
         env_file=str(env_path), 

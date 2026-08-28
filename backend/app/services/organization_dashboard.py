@@ -100,14 +100,32 @@ class OrganizationDashboardService:
             select(func.count(Repository.id))
             .where(Repository.organization_id == organization_id, Repository.sync_status == "COMPLETED")
         ) or 0
+        
+        # Get ai_credits from canonical workspace
+        from app.models.workspace import Workspace, AIWallet
+        ws = await db.scalar(select(Workspace).where(Workspace.organization_id == organization_id))
+        ai_credits = 0
+        if ws:
+            wallet = await db.scalar(select(AIWallet).where(AIWallet.workspace_id == ws.id))
+            if wallet:
+                ai_credits = wallet.balance_units
 
         # (Removed heavy queries for recent projects, repos, bugs, and members)
 
         # 6. Recent Activity
+        # Exclude low-level indexing/system events
+        excluded_events = [
+            "INDEX_STARTED", "INDEX_COMPLETED", "INDEX_FAILED", "INDEX_QUEUED", 
+            "INDEX_CLONING", "INDEX_PARSING", "INDEX_ANALYZING", "INDEX_EMBEDDING", "INDEX_STORING"
+        ]
+        
         activity_result = await db.execute(
             select(OrganizationAuditLog, User.full_name, User.avatar_url)
             .outerjoin(User, OrganizationAuditLog.actor_id == User.id)
-            .where(OrganizationAuditLog.organization_id == organization_id)
+            .where(
+                OrganizationAuditLog.organization_id == organization_id,
+                OrganizationAuditLog.event_type.not_in(excluded_events)
+            )
             .order_by(desc(OrganizationAuditLog.created_at))
             .limit(10)
         )
@@ -118,30 +136,45 @@ class OrganizationDashboardService:
             if not last_activity_at:
                 last_activity_at = a.created_at.isoformat() if getattr(a, 'created_at', None) else None
                 
-            # Map audit log event_type to new DashboardActivityType
             event_type = DashboardActivityType.member_joined # default fallback
             title = "Activity"
             desc_text = ""
             
-            if a.event_type == "organization.updated":
-                title = "Organization Updated"
+            if a.event_type == "organization.created":
+                title = "Organization Created"
+                desc_text = "The organization was successfully created."
+                event_type = DashboardActivityType.project_created # Fallback type for UI color
+            elif a.event_type == "settings.updated":
+                title = "Settings Updated"
                 desc_text = "Organization settings were updated."
-                event_type = DashboardActivityType.project_created # fallback since org updated isnt an enum
-            elif a.event_type == "member.invited":
+                event_type = DashboardActivityType.project_created
+            elif a.event_type == "invitation.created":
                 title = "Member Invited"
                 desc_text = "A new invitation was sent."
                 event_type = DashboardActivityType.invitation_created
-            elif a.event_type == "member.joined":
+            elif a.event_type == "invitation.accepted":
                 title = "Member Joined"
                 desc_text = "A new member joined the organization."
                 event_type = DashboardActivityType.member_joined
-            elif a.event_type == "project.created":
-                title = "Project Created"
-                desc_text = "A new project was created."
-                event_type = DashboardActivityType.project_created
-            elif a.event_type == "repository.connected":
-                title = "Repository Connected"
-                desc_text = "A repository was successfully connected."
+            elif a.event_type == "invitation.revoked":
+                title = "Invitation Revoked"
+                desc_text = "An invitation was revoked."
+                event_type = DashboardActivityType.invitation_revoked
+            elif a.event_type == "member.removed":
+                title = "Member Removed"
+                desc_text = "A member was removed from the organization."
+                event_type = DashboardActivityType.invitation_revoked
+            elif a.event_type == "github.connected" or a.event_type == "repository.connected":
+                title = "GitHub Connected"
+                desc_text = "A GitHub account was successfully connected."
+                event_type = DashboardActivityType.repository_connected
+            elif a.event_type == "github.disconnected" or a.event_type == "repository.disconnected":
+                title = "GitHub Disconnected"
+                desc_text = "A GitHub account was disconnected."
+                event_type = DashboardActivityType.repository_disconnected
+            elif a.event_type == "repository.imported":
+                title = "Repository Imported"
+                desc_text = "A repository was successfully imported."
                 event_type = DashboardActivityType.repository_connected
             elif a.event_type == "bug.created":
                 title = "Bug Reported"
@@ -186,7 +219,8 @@ class OrganizationDashboardService:
                 "repositories_total": repos_total,
                 "repositories_indexed": repos_indexed,
                 "bugs_open": bugs_open,
-                "bugs_critical": bugs_critical
+                "bugs_critical": bugs_critical,
+                "ai_credits": ai_credits
             },
             
             "recent_activity": recent_activity

@@ -47,6 +47,7 @@ class UserService(BaseService[User, RepositoryUser]):
         workspace = Workspace(
             name=f"{full_name}'s Workspace",
             slug=slug,
+            owner_id=user.id,
             status=WorkspaceStatus.ACTIVE,
             settings={}
         )

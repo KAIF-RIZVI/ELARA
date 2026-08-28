@@ -42,6 +42,19 @@ async def create_organization(
     org = await organization_service.create_organization(db, org_in, current_user.id)
     return org
 
+@router.patch("/{organization_id}", response_model=OrganizationResponse)
+async def update_organization(
+    organization_id: uuid.UUID,
+    org_in: OrganizationUpdate,
+    db: SessionDep,
+    current_user: CurrentUser,
+):
+    # Check permissions (Owner/Admin)
+    await RequireOrganizationRole(OrganizationRole.ADMIN)(organization_id, db, current_user)
+    
+    org = await organization_service.update_organization(db, organization_id, org_in, current_user.id)
+    return org
+
 @router.get("/me", response_model=List[OrganizationSwitcherResponse])
 async def list_my_organizations(
     db: SessionDep, 
@@ -296,3 +309,69 @@ async def reject_join_request(
         db, organization_id, request_id, current_user.id
     )
     return {"message": "Join request rejected"}
+
+@router.delete("/{organization_id}", status_code=status.HTTP_202_ACCEPTED)
+async def delete_organization(
+    organization_id: uuid.UUID,
+    db: SessionDep,
+    current_user: CurrentUser,
+    member = Depends(RequireOrganizationRole(OrganizationRole.OWNER))
+):
+    """
+    Initiate the secure, background deletion of an organization.
+    Only the OWNER can trigger this.
+    """
+    from app.models.organization import OrganizationStatus, Organization
+    from app.worker.tasks.org_tasks import delete_organization_task
+    from sqlalchemy import select
+    
+    org = await db.scalar(select(Organization).where(Organization.id == organization_id))
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+        
+    if org.status == OrganizationStatus.DELETED:
+        raise HTTPException(status_code=400, detail="Organization is already deleted")
+        
+    if org.status == OrganizationStatus.DELETING:
+        # Idempotent behavior
+        return {
+            "organization_id": str(organization_id),
+            "status": "DELETING",
+            "message": "Organization deletion is already in progress"
+        }
+        
+    # Atomically lock the organization
+    org.status = OrganizationStatus.DELETING
+    await db.commit()
+    
+    # Trigger Celery deletion workflow
+    task = delete_organization_task.delay(str(organization_id))
+    
+    return {
+        "organization_id": str(organization_id),
+        "status": "DELETING",
+        "deletion_job_id": task.id
+    }
+
+@router.get("/{organization_id}/deletion-status")
+async def get_deletion_status(
+    organization_id: uuid.UUID,
+    db: SessionDep,
+    current_user: CurrentUser
+):
+    """
+    Get the deletion status of an organization.
+    Since membership records might be deleted, this endpoint checks basic user relation
+    or just looks up the org status globally if they are authenticated (for UX reasons).
+    """
+    from app.models.organization import OrganizationStatus, Organization
+    from sqlalchemy import select
+    
+    # For a deleting/deleted org, the membership might be gone.
+    # We will just return the status directly for authenticated users querying it.
+    org = await db.scalar(select(Organization).where(Organization.id == organization_id))
+    if not org:
+        return {"organization_id": str(organization_id), "status": "DELETED"}
+    return {"organization_id": str(organization_id), "status": org.status.value}
+
+

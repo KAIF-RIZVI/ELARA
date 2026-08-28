@@ -1,17 +1,11 @@
 import asyncio
-from sqlalchemy import select
-from app.core.database import AsyncSessionLocal
-from app.models.identity import User
-from app.models.organization import OrganizationMember
+from app.db.session import async_session_maker
+from app.repositories.user import user as user_repo
 
-async def check():
-    async with AsyncSessionLocal() as session:
-        users = await session.execute(select(User))
-        for u in users.scalars().all():
-            print(f"User: {u.email}, {u.full_name}, {u.id}")
-            mems = await session.execute(select(OrganizationMember).where(OrganizationMember.user_id == u.id))
-            for m in mems.scalars().all():
-                print(f"  OrgMember: Org {m.organization_id}, Role {m.role}")
+async def main():
+    async with async_session_maker() as db:
+        users = await user_repo.get_multi(db, skip=0, limit=100)
+        print("Registered Emails:", [u.email for u in users])
 
 if __name__ == "__main__":
-    asyncio.run(check())
+    asyncio.run(main())

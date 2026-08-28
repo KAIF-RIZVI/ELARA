@@ -1,0 +1,32 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: qdrant-snapshot-cronjob
+  namespace: elara-qdrant
+spec:
+  schedule: "0 2 * * *" # Run at 2 AM every day
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: qdrant-snapshot-creator
+            image: curlimages/curl:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Triggering Qdrant full cluster snapshot..."
+              curl -s -X POST "http://elara-qdrant:6333/snapshots" \
+                -H "api-key: ${QDRANT_API_KEY}" \
+                -H "Content-Type: application/json" | grep -q "result" \
+                && echo "Snapshot triggered successfully." || (echo "Failed to trigger snapshot." && exit 1)
+            env:
+            - name: QDRANT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: qdrant-production-secrets
+                  key: api-key
+          restartPolicy: OnFailure

@@ -1,0 +1,262 @@
+﻿Folder PATH listing
+Volume serial number is 000000E3 D68C:107F
+C:.
+|   main.py
+|   tree.txt
+|   __init__.py
+|   
++---ai
+|   |   ast_parser.py
+|   |   embeddings.py
+|   |   fusion_engine.py
+|   |   vector_store.py
+|   |   __init__.py
+|   |   
+|   +---developer_knowledge
+|   +---explainability
+|   +---fusion
+|   +---graphcodebert
+|   +---llm
+|   +---ranking
+|   +---retrieval
+|   \---__pycache__
+|           ast_parser.cpython-312.pyc
+|           embeddings.cpython-312.pyc
+|           fusion_engine.cpython-312.pyc
+|           vector_store.cpython-312.pyc
+|           __init__.cpython-312.pyc
+|           
++---api
+|   |   deps.py
+|   |   schemas.py
+|   |   
+|   +---dependencies
+|   +---routes
+|   +---v1
+|   |   |   api.py
+|   |   |   
+|   |   +---endpoints
+|   |   |   |   auth.py
+|   |   |   |   bugs.py
+|   |   |   |   dashboard.py
+|   |   |   |   members.py
+|   |   |   |   notifications.py
+|   |   |   |   organizations.py
+|   |   |   |   profiles.py
+|   |   |   |   projects.py
+|   |   |   |   repositories.py
+|   |   |   |   search.py
+|   |   |   |   teams.py
+|   |   |   |   users.py
+|   |   |   |   workspaces.py
+|   |   |   |   
+|   |   |   \---__pycache__
+|   |   |           auth.cpython-312.pyc
+|   |   |           bugs.cpython-312.pyc
+|   |   |           dashboard.cpython-312.pyc
+|   |   |           members.cpython-312.pyc
+|   |   |           notifications.cpython-312.pyc
+|   |   |           organizations.cpython-312.pyc
+|   |   |           profiles.cpython-312.pyc
+|   |   |           projects.cpython-312.pyc
+|   |   |           repositories.cpython-312.pyc
+|   |   |           search.cpython-312.pyc
+|   |   |           teams.cpython-312.pyc
+|   |   |           users.cpython-312.pyc
+|   |   |           workspaces.cpython-312.pyc
+|   |   |           
+|   |   \---__pycache__
+|   |           api.cpython-312.pyc
+|   |           
+|   \---__pycache__
+|           deps.cpython-312.pyc
+|           schemas.cpython-312.pyc
+|           
++---core
+|   |   base_model.py
+|   |   base_repository.py
+|   |   base_service.py
+|   |   config.py
+|   |   constants.py
+|   |   database.py
+|   |   rate_limit.py
+|   |   security.py
+|   |   
+|   \---__pycache__
+|           base_model.cpython-312.pyc
+|           base_repository.cpython-312.pyc
+|           base_service.cpython-312.pyc
+|           config.cpython-312.pyc
+|           constants.cpython-312.pyc
+|           database.cpython-312.pyc
+|           rate_limit.cpython-312.pyc
+|           security.cpython-312.pyc
+|           
++---database
+|   |   base.py
+|   |   seed.py
+|   |   session.py
+|   |   
+|   +---migrations
+|   +---requirements
+|   \---__pycache__
+|           base.cpython-312.pyc
+|           seed.cpython-312.pyc
+|           session.cpython-312.pyc
+|           
++---integrations
+|   +---aws
+|   +---email
+|   +---github
+|   +---google
+|   \---webhook
++---middleware
++---models
+|   |   ai.py
+|   |   bug.py
+|   |   developer.py
+|   |   identity.py
+|   |   integrations.py
+|   |   notification.py
+|   |   organization.py
+|   |   profile.py
+|   |   project.py
+|   |   system.py
+|   |   team.py
+|   |   workspace.py
+|   |   __init__.py
+|   |   
+|   \---__pycache__
+|           ai.cpython-312.pyc
+|           bug.cpython-312.pyc
+|           developer.cpython-312.pyc
+|           identity.cpython-312.pyc
+|           integrations.cpython-312.pyc
+|           notification.cpython-312.pyc
+|           organization.cpython-312.pyc
+|           profile.cpython-312.pyc
+|           project.cpython-312.pyc
+|           system.cpython-312.pyc
+|           team.cpython-312.pyc
+|           workspace.cpython-312.pyc
+|           __init__.cpython-312.pyc
+|           
++---modules
+|   \---workspaces
+|       |   models.py
+|       |   
+|       \---__pycache__
+|               models.cpython-312.pyc
+|               
++---repositories
+|   |   activity.py
+|   |   bug.py
+|   |   dashboard.py
+|   |   profile.py
+|   |   repository.py
+|   |   user.py
+|   |   workspace.py
+|   |   
+|   \---__pycache__
+|           activity.cpython-312.pyc
+|           bug.cpython-312.pyc
+|           dashboard.cpython-312.pyc
+|           profile.cpython-312.pyc
+|           repository.cpython-312.pyc
+|           user.cpython-312.pyc
+|           workspace.cpython-312.pyc
+|           
++---schemas
+|   |   bug.py
+|   |   dashboard.py
+|   |   member.py
+|   |   notification.py
+|   |   organization.py
+|   |   profile.py
+|   |   project.py
+|   |   repository.py
+|   |   search.py
+|   |   team.py
+|   |   user.py
+|   |   workspace.py
+|   |   
+|   \---__pycache__
+|           bug.cpython-312.pyc
+|           dashboard.cpython-312.pyc
+|           member.cpython-312.pyc
+|           notification.cpython-312.pyc
+|           organization.cpython-312.pyc
+|           profile.cpython-312.pyc
+|           project.cpython-312.pyc
+|           repository.cpython-312.pyc
+|           search.cpython-312.pyc
+|           team.cpython-312.pyc
+|           user.cpython-312.pyc
+|           workspace.cpython-312.pyc
+|           
++---services
+|   |   activity.py
+|   |   bug.py
+|   |   dashboard.py
+|   |   email_service.py
+|   |   github_service.py
+|   |   notification_service.py
+|   |   organization.py
+|   |   organization_audit.py
+|   |   organization_dashboard.py
+|   |   organization_discovery.py
+|   |   organization_invitation.py
+|   |   organization_member.py
+|   |   organization_settings.py
+|   |   profile.py
+|   |   repository.py
+|   |   search.py
+|   |   session_service.py
+|   |   user.py
+|   |   workspace.py
+|   |   
+|   \---__pycache__
+|           activity.cpython-312.pyc
+|           bug.cpython-312.pyc
+|           dashboard.cpython-312.pyc
+|           email_service.cpython-312.pyc
+|           github_service.cpython-312.pyc
+|           notification_service.cpython-312.pyc
+|           organization.cpython-312.pyc
+|           organization_audit.cpython-312.pyc
+|           organization_dashboard.cpython-312.pyc
+|           organization_discovery.cpython-312.pyc
+|           organization_invitation.cpython-312.pyc
+|           organization_member.cpython-312.pyc
+|           organization_settings.cpython-312.pyc
+|           profile.cpython-312.pyc
+|           repository.cpython-312.pyc
+|           search.cpython-312.pyc
+|           session_service.cpython-312.pyc
+|           user.cpython-312.pyc
+|           workspace.cpython-312.pyc
+|           
++---static
++---templates
++---utils
++---worker
+|   |   celery_app.py
+|   |   __init__.py
+|   |   
+|   +---tasks
+|   |   |   repo_tasks.py
+|   |   |   __init__.py
+|   |   |   
+|   |   \---__pycache__
+|   |           repo_tasks.cpython-312.pyc
+|   |           __init__.cpython-312.pyc
+|   |           
+|   \---__pycache__
+|           celery_app.cpython-312.pyc
+|           __init__.cpython-312.pyc
+|           
++---workers
+\---__pycache__
+        main.cpython-312.pyc
+        __init__.cpython-312.pyc
+        

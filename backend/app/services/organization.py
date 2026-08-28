@@ -13,6 +13,7 @@ from app.models.organization import (
 )
 from app.schemas.organization import OrganizationCreate, OrganizationUpdate
 from fastapi import HTTPException
+from app.services.workspace import workspace_service
 
 class OrganizationService:
     async def create_organization(self, db: AsyncSession, org_in: OrganizationCreate, user_id: uuid.UUID) -> Organization:
@@ -70,9 +71,58 @@ class OrganizationService:
         )
         db.add(audit_log)
         
+        await db.flush()
+        
+        # Create Canonical Workspace
+        workspace = await workspace_service.create_workspace(
+            db,
+            name=db_org.name,
+            slug=db_org.slug,
+            user_id=user_id,
+            organization_id=db_org.id,
+            settings={}
+        )
+        
+        # Provision AI Wallet for Organization
+        from app.models.workspace import AIWallet
+        wallet = AIWallet(
+            workspace_id=workspace.id,
+            balance_units=1000,
+            monthly_grant=1000
+        )
+        db.add(wallet)
+        
         await db.commit()
         await db.refresh(db_org)
         return db_org
+
+    async def update_organization(
+        self, db: AsyncSession, organization_id: uuid.UUID, org_in: "OrganizationUpdate", user_id: uuid.UUID
+    ) -> Organization:
+        stmt = select(Organization).where(Organization.id == organization_id)
+        result = await db.execute(stmt)
+        org = result.scalar_one_or_none()
+        
+        if not org:
+            raise HTTPException(status_code=404, detail="Organization not found")
+            
+        update_data = org_in.dict(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(org, field, value)
+            
+        # Create Audit Log
+        audit_log = OrganizationAuditLog(
+            organization_id=org.id,
+            actor_id=user_id,
+            action="ORGANIZATION_UPDATED",
+            resource_type="organization",
+            resource_id=str(org.id)
+        )
+        db.add(audit_log)
+        
+        await db.commit()
+        await db.refresh(org)
+        return org
         
     async def get_user_organizations(self, db: AsyncSession, user_id: uuid.UUID) -> List[Dict[str, Any]]:
         from sqlalchemy import func

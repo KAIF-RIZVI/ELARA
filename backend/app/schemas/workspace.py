@@ -8,6 +8,7 @@ class WorkspaceBase(BaseModel):
     slug: str
 
 class WorkspaceCreate(WorkspaceBase):
+    organization_id: uuid.UUID
     settings: dict[str, Any] | None = None
 
 class WorkspaceUpdate(BaseModel):
@@ -18,6 +19,7 @@ class WorkspaceUpdate(BaseModel):
 
 class WorkspaceResponse(WorkspaceBase):
     id: uuid.UUID
+    organization_id: uuid.UUID | None = None
     description: str | None = None
     logo_url: str | None = None
     status: WorkspaceStatus
@@ -30,3 +32,17 @@ class WorkspaceOverview(WorkspaceResponse):
     members_count: int = 0
     repositories_count: int = 0
     ai_credits_remaining: int = 0
+
+class ActivityLogResponse(BaseModel):
+    id: uuid.UUID
+    workspace_id: uuid.UUID | None = None
+    organization_id: uuid.UUID | None = None
+    bug_id: uuid.UUID | None = None
+    action: str
+    target: str
+    status: str
+    user_id: uuid.UUID | None = None
+    metadata_payload: dict[str, Any] | None = None
+    created_at: Any | None = None
+
+    model_config = ConfigDict(from_attributes=True)

@@ -73,11 +73,19 @@ async def get_workspace_activity(
 @router.post("", response_model=WorkspaceResponse)
 async def create_workspace(db: SessionDep, current_user: CurrentUser, workspace_in: WorkspaceCreate):
     try:
+        if workspace_in.organization_id:
+            from sqlalchemy import select
+            from app.models.workspace import Workspace
+            existing = await db.scalar(select(Workspace).where(Workspace.organization_id == workspace_in.organization_id))
+            if existing:
+                raise HTTPException(status_code=400, detail="Organizations can only have one workspace in V1.")
+                
         workspace = await workspace_service.create_workspace(
             db, 
             name=workspace_in.name, 
             slug=workspace_in.slug, 
             user_id=current_user.id,
+            organization_id=workspace_in.organization_id,
             settings=workspace_in.settings
         )
         return workspace

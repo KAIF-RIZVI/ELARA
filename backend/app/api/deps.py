@@ -3,6 +3,8 @@ from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 import jwt
+from fastapi.security.api_key import APIKeyHeader
+from app.services.api_keys import api_key_service
 
 from app.core.database import get_db as db_get_db
 from app.core.security import decode_access_token
@@ -134,3 +136,31 @@ class RequireOrganizationRole:
             )
 
         return member
+
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+async def verify_workspace_api_key(
+    request: Request,
+    db: SessionDep,
+    api_key_header_val: str = Depends(api_key_header)
+):
+    key_to_verify = api_key_header_val
+    if not key_to_verify:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            key_to_verify = auth_header.split(" ")[1]
+            
+    if not key_to_verify:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing API Key",
+        )
+        
+    api_key = await api_key_service.verify_and_get_workspace_for_key(db, raw_key=key_to_verify)
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or revoked API Key",
+        )
+        
+    return api_key

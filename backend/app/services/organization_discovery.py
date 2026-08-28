@@ -68,17 +68,27 @@ class OrganizationDiscoveryService:
             owner_name_subq.label("owner_name"),
             is_member_subq.label("is_member"),
             has_pending_subq.label("has_pending")
-        ).where(
-            Organization.discoverable == True
         )
 
         if query:
             try:
                 org_id = uuid.UUID(query)
+                # Exact UUID match overrides discoverable check
                 stmt = stmt.where(Organization.id == org_id)
             except ValueError:
-                # If query is not a valid UUID, return empty result
-                stmt = stmt.where(False)
+                # Search by name/slug, MUST be discoverable
+                stmt = stmt.where(
+                    and_(
+                        Organization.discoverable == True,
+                        or_(
+                            Organization.name.ilike(f"%{query}%"),
+                            Organization.slug.ilike(f"%{query}%")
+                        )
+                    )
+                )
+        else:
+            # No query, only discoverable
+            stmt = stmt.where(Organization.discoverable == True)
 
         stmt = stmt.limit(limit).offset(offset).order_by(Organization.name)
         result = await db.execute(stmt)
@@ -160,13 +170,27 @@ class OrganizationDiscoveryService:
         if existing_req:
             raise HTTPException(status_code=400, detail="You already have a pending join request")
             
+        status = JoinRequestStatus.PENDING
+        if org.join_policy == JoinPolicy.OPEN:
+            status = JoinRequestStatus.APPROVED
+            
         req = OrganizationJoinRequest(
             organization_id=organization_id,
             user_id=user_id,
             message=message,
-            status=JoinRequestStatus.PENDING
+            status=status,
+            reviewed_at=datetime.now(timezone.utc) if status == JoinRequestStatus.APPROVED else None
         )
         db.add(req)
+        
+        if status == JoinRequestStatus.APPROVED:
+            member = OrganizationMember(
+                organization_id=organization_id,
+                user_id=user_id,
+                role=OrganizationRole.VIEWER,
+                status="ACTIVE"
+            )
+            db.add(member)
         
         # Log Audit Event
         audit_log = OrganizationAuditLog(
@@ -187,17 +211,30 @@ class OrganizationDiscoveryService:
         admin_ids = [row[0] for row in admins_result.all()]
         applicant = (await db.execute(select(User).where(User.id == user_id))).scalar_one()
 
-        await notification_service.create_bulk_notifications(
-            db=db,
-            recipient_user_ids=admin_ids,
-            type=NotificationType.JOIN_REQUEST,
-            title="Join Request",
-            message=f"{applicant.full_name} requested to join {org.name}",
-            priority=NotificationPriority.INFO,
-            organization_id=organization_id,
-            action_url=f"/organizations/{org.slug}/team",
-            action_label="View Request"
-        )
+        if status == JoinRequestStatus.PENDING:
+            await notification_service.create_bulk_notifications(
+                db=db,
+                recipient_user_ids=admin_ids,
+                type=NotificationType.JOIN_REQUEST,
+                title="Join Request",
+                message=f"{applicant.full_name} requested to join {org.name}",
+                priority=NotificationPriority.INFO,
+                organization_id=organization_id,
+                action_url=f"/organizations/{org.slug}/team",
+                action_label="View Request"
+            )
+        else:
+            await notification_service.create_bulk_notifications(
+                db=db,
+                recipient_user_ids=admin_ids,
+                type=NotificationType.JOIN_APPROVED,
+                title="New Member Joined",
+                message=f"{applicant.full_name} joined {org.name}",
+                priority=NotificationPriority.INFO,
+                organization_id=organization_id,
+                action_url=f"/organizations/{org.slug}/team",
+                action_label="View Team"
+            )
         
         await db.commit()
         await db.refresh(req)

@@ -1,5 +1,6 @@
 import uuid
 import enum
+from datetime import datetime
 from sqlalchemy import String, Enum as SQLEnum, ForeignKey, DateTime, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.base_model import AuditBase, WorkspaceEntityBase
@@ -118,3 +119,16 @@ class PasswordResetToken(AuditBase):
     token_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
     expires_at: Mapped[str] = mapped_column(DateTime(timezone=True), nullable=False)
     used_at: Mapped[str | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+class WorkspaceAPIKey(AuditBase):
+    __tablename__ = "workspace_api_keys"
+
+    workspace_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    
+    key_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    prefix: Mapped[str] = mapped_column(String, nullable=False)
+    
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

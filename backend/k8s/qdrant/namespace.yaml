@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: elara-qdrant
+  labels:
+    name: elara-qdrant
+    environment: production

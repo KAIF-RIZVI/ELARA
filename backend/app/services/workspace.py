@@ -6,7 +6,20 @@ from app.models.workspace import Workspace, WorkspaceStatus
 from app.repositories.workspace import RepositoryWorkspace, workspace as workspace_repo
 
 class WorkspaceService(BaseService[Workspace, RepositoryWorkspace]):
-    async def create_workspace(self, db: AsyncSession, *, name: str, slug: str, user_id: uuid.UUID, settings: dict[str, Any] | None = None) -> Workspace:
+    async def create_workspace(self, db: AsyncSession, *, name: str, slug: str, user_id: uuid.UUID, organization_id: uuid.UUID, settings: dict[str, Any] | None = None) -> Workspace:
+        from app.models.organization import OrganizationMember
+        from sqlalchemy import select
+        
+        # Verify user belongs to the specified organization
+        stmt = select(OrganizationMember).where(
+            OrganizationMember.organization_id == organization_id,
+            OrganizationMember.user_id == user_id
+        )
+        result = await db.execute(stmt)
+        org_member = result.scalar_one_or_none()
+        if not org_member:
+            raise ValueError("User does not belong to the specified organization or organization does not exist.")
+
         # Check if slug exists
         existing = await self.repository.get_by_slug(db, slug)
         if existing:
@@ -15,6 +28,7 @@ class WorkspaceService(BaseService[Workspace, RepositoryWorkspace]):
         workspace = Workspace(
             name=name,
             slug=slug,
+            organization_id=organization_id,
             status=WorkspaceStatus.ACTIVE,
             settings=settings or {}
         )
