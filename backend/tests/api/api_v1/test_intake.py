@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.workspace import Workspace
 from app.models.organization import Organization
-from app.models.identity import WorkspaceAPIKey, User
+from app.models.identity import APIKey, User
 from app.models.bug import Bug, BugSource
 import uuid
 
@@ -152,7 +152,7 @@ async def test_api_key_last_used_at_updates(async_client: AsyncClient, db: Async
     raw_key, key_id = api_key_setup
     
     # Check initial last_used_at
-    result = await db.execute(select(WorkspaceAPIKey).where(WorkspaceAPIKey.id == key_id))
+    result = await db.execute(select(APIKey).where(APIKey.id == key_id))
     key_db = result.scalar_one()
     assert key_db.last_used_at is None
     
@@ -308,3 +308,4 @@ async def test_concurrent_duplicate_submission(async_client: AsyncClient, api_ke
     # Ensure they all returned the exact same bug_id
     bug_ids = set(r.json()["id"] for r in responses)
     assert len(bug_ids) == 1
+

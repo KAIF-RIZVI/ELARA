@@ -139,7 +139,7 @@ class RequireOrganizationRole:
 
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
-async def verify_workspace_api_key(
+async def verify_api_key(
     request: Request,
     db: SessionDep,
     api_key_header_val: str = Depends(api_key_header)

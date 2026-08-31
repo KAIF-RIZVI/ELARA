@@ -1,7 +1,7 @@
 import uuid
 import enum
 from datetime import datetime
-from sqlalchemy import String, Enum as SQLEnum, ForeignKey, DateTime, UniqueConstraint
+from sqlalchemy import String, Enum as SQLEnum, ForeignKey, DateTime, UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.base_model import AuditBase, WorkspaceEntityBase
 
@@ -94,15 +94,7 @@ class WorkspaceInvitation(WorkspaceEntityBase):
     expires_at: Mapped[str | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # invited_by and invited_at are natively provided by AuditBase (created_by, created_at) inherited through WorkspaceEntityBase
 
-class APIKey(AuditBase):
-    __tablename__ = "api_keys"
 
-    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
-    key_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
-    label: Mapped[str] = mapped_column(String, nullable=False)
-    scopes: Mapped[str] = mapped_column(String, nullable=False)
-    last_used_at: Mapped[str | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    revoked_at: Mapped[str | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 class EmailVerificationToken(AuditBase):
     __tablename__ = "email_verification_tokens"
@@ -120,11 +112,14 @@ class PasswordResetToken(AuditBase):
     expires_at: Mapped[str] = mapped_column(DateTime(timezone=True), nullable=False)
     used_at: Mapped[str | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-class WorkspaceAPIKey(AuditBase):
-    __tablename__ = "workspace_api_keys"
+class APIKey(AuditBase):
+    __tablename__ = "api_keys"
+    __table_args__ = (
+        CheckConstraint("(workspace_id IS NULL) <> (organization_id IS NULL)", name="chk_apikey_owner"),
+    )
 
-    workspace_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
-    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True, index=True)
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True)
     
     key_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
     name: Mapped[str] = mapped_column(String, nullable=False)

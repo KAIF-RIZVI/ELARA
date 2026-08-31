@@ -3,7 +3,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.workspace import Workspace, ActivityLog
-from app.models.identity import WorkspaceAPIKey
+from app.models.identity import APIKey
 from app.services.api_keys import api_key_service
 
 @pytest.mark.asyncio
@@ -112,3 +112,4 @@ async def test_plaintext_key_not_in_logs(auth_client: AsyncClient, db: AsyncSess
     for log in logs:
         assert raw_key not in log.action
         assert raw_key not in log.target
+

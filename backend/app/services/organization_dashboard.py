@@ -79,21 +79,16 @@ class OrganizationDashboardService:
         proj_ids_result = await db.execute(select(Project.id).where(Project.organization_id == organization_id))
         project_ids = [row[0] for row in proj_ids_result.fetchall()]
         
-        bugs_open = 0
-        bugs_critical = 0
-        ai_jobs_total = 0
+        # Bug counts (all bugs in the organization)
+        bugs_open = await db.scalar(
+            select(func.count(Bug.id))
+            .where(Bug.organization_id == organization_id, Bug.state != BugState.CLOSED, Bug.is_deleted == False)
+        ) or 0
         
-        if project_ids:
-            # Bug counts
-            bugs_open = await db.scalar(
-                select(func.count(Bug.id))
-                .where(Bug.project_id.in_(project_ids), Bug.state != BugState.CLOSED)
-            ) or 0
-            
-            bugs_critical = await db.scalar(
-                select(func.count(Bug.id))
-                .where(Bug.project_id.in_(project_ids), Bug.state != BugState.CLOSED, Bug.severity == "CRITICAL")
-            ) or 0
+        bugs_critical = await db.scalar(
+            select(func.count(Bug.id))
+            .where(Bug.organization_id == organization_id, Bug.state != BugState.CLOSED, Bug.severity == "CRITICAL", Bug.is_deleted == False)
+        ) or 0
 
         # Repositories indexed (ai_ready)
         repos_indexed = await db.scalar(

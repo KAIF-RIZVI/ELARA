@@ -6,7 +6,7 @@ from sqlalchemy import select
 from app.core.base_model import Base
 from app.models.workspace import Workspace, WorkspaceStatus
 from app.models.organization import Organization, OrganizationMember, OrganizationRole
-from app.models.identity import User, WorkspaceAPIKey, MemberRole
+from app.models.identity import User, APIKey, MemberRole
 from app.models.bug import Bug, BugSource
 from app.services.workspace import workspace_service
 from app.schemas.workspace import WorkspaceCreate
@@ -113,7 +113,7 @@ class TestDataLayer(unittest.IsolatedAsyncioTestCase):
     async def test_workspace_api_keys_cross_boundary(self):
         async with self.TestingSessionLocal() as db:
             # DB constraints for workspace API key requires BOTH org and ws
-            key = WorkspaceAPIKey(
+            key = APIKey(
                 key_hash="hash",
                 name="Test Key",
                 prefix="test_"
@@ -125,3 +125,4 @@ class TestDataLayer(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == '__main__':
     unittest.main()
+

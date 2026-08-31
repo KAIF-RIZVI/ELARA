@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import auth, workspaces, bugs, repositories, users, dashboard, profiles, members, teams, projects, organizations, search, notifications, indexing, github, ai, api_keys, intake
+from app.api.v1.endpoints import auth, workspaces, bugs, organization_bugs, repositories, users, dashboard, profiles, members, teams, projects, organizations, search, notifications, indexing, github, ai, api_keys, organization_api_keys, intake
 
 api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
@@ -7,7 +7,9 @@ api_router.include_router(organizations.router, prefix="/organizations", tags=["
 api_router.include_router(workspaces.router, prefix="/workspaces", tags=["workspaces"])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
 api_router.include_router(bugs.router, prefix="/workspaces/{workspace_id}/bugs", tags=["bugs"])
+api_router.include_router(organization_bugs.router, prefix="/organizations/{organization_id}/bugs", tags=["organization-bugs"])
 api_router.include_router(api_keys.router, prefix="/workspaces/{workspace_id}/api-keys", tags=["api_keys"])
+api_router.include_router(organization_api_keys.router, prefix="/organizations/{organization_id}/api-keys", tags=["organization-api_keys"])
 api_router.include_router(repositories.router, prefix="/repositories", tags=["repositories"])
 api_router.include_router(github.router, prefix="/github", tags=["github"])
 api_router.include_router(indexing.router, prefix="/indexing", tags=["indexing"])

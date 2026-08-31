@@ -73,25 +73,6 @@ class OrganizationService:
         
         await db.flush()
         
-        # Create Canonical Workspace
-        workspace = await workspace_service.create_workspace(
-            db,
-            name=db_org.name,
-            slug=db_org.slug,
-            user_id=user_id,
-            organization_id=db_org.id,
-            settings={}
-        )
-        
-        # Provision AI Wallet for Organization
-        from app.models.workspace import AIWallet
-        wallet = AIWallet(
-            workspace_id=workspace.id,
-            balance_units=1000,
-            monthly_grant=1000
-        )
-        db.add(wallet)
-        
         await db.commit()
         await db.refresh(db_org)
         return db_org

@@ -26,16 +26,19 @@ VALID_TRANSITIONS = {
 
 class BugService:
     async def create_bug(
-        self, db: AsyncSession, *, obj_in: BugCreate, organization_id: uuid.UUID, workspace_id: uuid.UUID, user_id: Optional[uuid.UUID] = None, source: BugSource = BugSource.MANUAL, commit: bool = True
+        self, db: AsyncSession, *, obj_in: BugCreate, organization_id: Optional[uuid.UUID] = None, workspace_id: Optional[uuid.UUID] = None, user_id: Optional[uuid.UUID] = None, source: BugSource = BugSource.MANUAL, commit: bool = True
     ) -> Bug:
-        # Check legacy workspace safety and tenant isolation
-        workspace = await db.scalar(select(Workspace).where(Workspace.id == workspace_id))
-        if not workspace:
-            raise ValueError("Workspace not found.")
-        if workspace.organization_id is None:
-            raise ValueError("Legacy workspaces without an organization cannot create bugs. Please migrate the workspace.")
-        if workspace.organization_id != organization_id:
-            raise ValueError("Workspace does not belong to the authorized organization.")
+        # Enforce XOR invariant: A bug must belong to EITHER an organization OR a personal workspace
+        if (organization_id is None) == (workspace_id is None):
+            raise ValueError("Bug must belong to exactly one of Organization or Workspace.")
+
+        if workspace_id:
+            # Check if this is a valid personal workspace (no organization_id)
+            workspace = await db.scalar(select(Workspace).where(Workspace.id == workspace_id))
+            if not workspace:
+                raise ValueError("Workspace not found.")
+            if workspace.organization_id is not None:
+                raise ValueError("Cannot create bugs in a workspace that belongs to an organization.")
 
         async with db.begin_nested():
             db_obj = Bug(
@@ -79,21 +82,23 @@ class BugService:
             await db.refresh(db_obj)
         return db_obj
 
-    async def get_bug(self, db: AsyncSession, bug_id: uuid.UUID, organization_id: uuid.UUID, workspace_id: uuid.UUID) -> Optional[Bug]:
-        stmt = select(Bug).where(
-            Bug.id == bug_id,
-            Bug.organization_id == organization_id,
-            Bug.workspace_id == workspace_id,
-            Bug.is_deleted == False
-        )
+    async def get_bug(self, db: AsyncSession, bug_id: uuid.UUID, organization_id: Optional[uuid.UUID] = None, workspace_id: Optional[uuid.UUID] = None) -> Optional[Bug]:
+        stmt = select(Bug).where(Bug.id == bug_id, Bug.is_deleted == False)
+        if organization_id:
+            stmt = stmt.where(Bug.organization_id == organization_id)
+        if workspace_id:
+            stmt = stmt.where(Bug.workspace_id == workspace_id)
+            
         return await db.scalar(stmt)
 
-    async def list_bugs(self, db: AsyncSession, organization_id: uuid.UUID, workspace_id: uuid.UUID) -> Sequence[Bug]:
-        stmt = select(Bug).where(
-            Bug.organization_id == organization_id,
-            Bug.workspace_id == workspace_id,
-            Bug.is_deleted == False
-        ).order_by(Bug.created_at.desc())
+    async def list_bugs(self, db: AsyncSession, organization_id: Optional[uuid.UUID] = None, workspace_id: Optional[uuid.UUID] = None) -> Sequence[Bug]:
+        stmt = select(Bug).where(Bug.is_deleted == False)
+        if organization_id:
+            stmt = stmt.where(Bug.organization_id == organization_id)
+        if workspace_id:
+            stmt = stmt.where(Bug.workspace_id == workspace_id)
+            
+        stmt = stmt.order_by(Bug.created_at.desc())
         result = await db.execute(stmt)
         return result.scalars().all()
 
@@ -106,7 +111,7 @@ class BugService:
         return result.scalars().all()
 
     async def update_bug(
-        self, db: AsyncSession, *, bug_id: uuid.UUID, obj_in: BugUpdate, organization_id: uuid.UUID, workspace_id: uuid.UUID, user_id: uuid.UUID
+        self, db: AsyncSession, *, bug_id: uuid.UUID, obj_in: BugUpdate, organization_id: Optional[uuid.UUID] = None, workspace_id: Optional[uuid.UUID] = None, user_id: uuid.UUID
     ) -> Bug:
         bug = await self.get_bug(db, bug_id, organization_id, workspace_id)
         if not bug:
@@ -137,7 +142,7 @@ class BugService:
         return bug
 
     async def change_status(
-        self, db: AsyncSession, *, bug_id: uuid.UUID, obj_in: BugStatusUpdate, organization_id: uuid.UUID, workspace_id: uuid.UUID, user_id: uuid.UUID
+        self, db: AsyncSession, *, bug_id: uuid.UUID, obj_in: BugStatusUpdate, organization_id: Optional[uuid.UUID] = None, workspace_id: Optional[uuid.UUID] = None, user_id: uuid.UUID
     ) -> Bug:
         bug = await self.get_bug(db, bug_id, organization_id, workspace_id)
         if not bug:
@@ -186,7 +191,7 @@ class BugService:
         return bug
 
     async def change_priority(
-        self, db: AsyncSession, *, bug_id: uuid.UUID, obj_in: BugPriorityUpdate, organization_id: uuid.UUID, workspace_id: uuid.UUID, user_id: uuid.UUID
+        self, db: AsyncSession, *, bug_id: uuid.UUID, obj_in: BugPriorityUpdate, organization_id: Optional[uuid.UUID] = None, workspace_id: Optional[uuid.UUID] = None, user_id: uuid.UUID
     ) -> Bug:
         bug = await self.get_bug(db, bug_id, organization_id, workspace_id)
         if not bug:
@@ -216,7 +221,7 @@ class BugService:
         return bug
 
     async def assign_developer(
-        self, db: AsyncSession, *, bug_id: uuid.UUID, obj_in: BugAssignUpdate, organization_id: uuid.UUID, workspace_id: uuid.UUID, user_id: uuid.UUID
+        self, db: AsyncSession, *, bug_id: uuid.UUID, obj_in: BugAssignUpdate, organization_id: Optional[uuid.UUID] = None, workspace_id: Optional[uuid.UUID] = None, user_id: uuid.UUID
     ) -> Bug:
         bug = await self.get_bug(db, bug_id, organization_id, workspace_id)
         if not bug:
@@ -235,14 +240,21 @@ class BugService:
                 assignment.removed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
             
             if developer_id is not None:
-                # Verify developer belongs to workspace
-                stmt_member = select(WorkspaceMember).where(
-                    WorkspaceMember.workspace_id == workspace_id,
-                    WorkspaceMember.user_id == developer_id
-                )
+                # Verify developer belongs to workspace or organization
+                if workspace_id:
+                    stmt_member = select(WorkspaceMember).where(
+                        WorkspaceMember.workspace_id == workspace_id,
+                        WorkspaceMember.user_id == developer_id
+                    )
+                else:
+                    stmt_member = select(OrganizationMember).where(
+                        OrganizationMember.organization_id == organization_id,
+                        OrganizationMember.user_id == developer_id
+                    )
+                
                 member = await db.scalar(stmt_member)
                 if not member:
-                    raise ValueError("Assignee is not a valid member of this workspace.")
+                    raise ValueError("Assignee is not a valid member of this scope.")
 
                 new_assignment = BugAssignment(
                     bug_id=bug_id,
@@ -282,7 +294,7 @@ class BugService:
         return bug
 
     async def add_comment(
-        self, db: AsyncSession, *, bug_id: uuid.UUID, obj_in: BugCommentCreate, organization_id: uuid.UUID, workspace_id: uuid.UUID, user_id: uuid.UUID
+        self, db: AsyncSession, *, bug_id: uuid.UUID, obj_in: BugCommentCreate, organization_id: Optional[uuid.UUID] = None, workspace_id: Optional[uuid.UUID] = None, user_id: uuid.UUID
     ) -> BugComment:
         bug = await self.get_bug(db, bug_id, organization_id, workspace_id)
         if not bug:
@@ -317,7 +329,7 @@ class BugService:
         return comment
 
     async def list_comments(
-        self, db: AsyncSession, *, bug_id: uuid.UUID, organization_id: uuid.UUID, workspace_id: uuid.UUID
+        self, db: AsyncSession, *, bug_id: uuid.UUID, organization_id: Optional[uuid.UUID] = None, workspace_id: Optional[uuid.UUID] = None
     ) -> Sequence[BugComment]:
         # ensure bug exists & is authorized
         bug = await self.get_bug(db, bug_id, organization_id, workspace_id)
@@ -332,7 +344,7 @@ class BugService:
         return result.scalars().all()
 
     async def delete_bug(
-        self, db: AsyncSession, *, bug_id: uuid.UUID, organization_id: uuid.UUID, workspace_id: uuid.UUID, user_id: uuid.UUID
+        self, db: AsyncSession, *, bug_id: uuid.UUID, organization_id: Optional[uuid.UUID] = None, workspace_id: Optional[uuid.UUID] = None, user_id: uuid.UUID
     ) -> None:
         bug = await self.get_bug(db, bug_id, organization_id, workspace_id)
         if not bug:
@@ -356,17 +368,19 @@ class BugService:
         await db.commit()
 
     async def get_bug_history(
-        self, db: AsyncSession, *, bug_id: uuid.UUID, organization_id: uuid.UUID, workspace_id: uuid.UUID
+        self, db: AsyncSession, *, bug_id: uuid.UUID, organization_id: Optional[uuid.UUID] = None, workspace_id: Optional[uuid.UUID] = None
     ) -> Sequence[ActivityLog]:
         bug = await self.get_bug(db, bug_id, organization_id, workspace_id)
         if not bug:
             raise ValueError("Bug not found or unauthorized.")
 
-        stmt = select(ActivityLog).where(
-            ActivityLog.bug_id == bug_id,
-            ActivityLog.organization_id == organization_id,
-            ActivityLog.workspace_id == workspace_id
-        ).order_by(ActivityLog.created_at.desc())
+        stmt = select(ActivityLog).where(ActivityLog.bug_id == bug_id)
+        if organization_id:
+            stmt = stmt.where(ActivityLog.organization_id == organization_id)
+        if workspace_id:
+            stmt = stmt.where(ActivityLog.workspace_id == workspace_id)
+            
+        stmt = stmt.order_by(ActivityLog.created_at.desc())
         result = await db.execute(stmt)
         return result.scalars().all()
 

@@ -1,6 +1,6 @@
 import uuid
 import enum
-from sqlalchemy import String, Enum as SQLEnum, ForeignKey, Integer, Text, DateTime, JSON, Boolean, UniqueConstraint
+from sqlalchemy import String, Enum as SQLEnum, ForeignKey, Integer, Text, DateTime, JSON, Boolean, UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB
 from app.core.base_model import AuditBase
@@ -37,9 +37,12 @@ class BugPriority(str, enum.Enum):
 
 class Bug(AuditBase):
     __tablename__ = "bugs"
+    __table_args__ = (
+        CheckConstraint("(workspace_id IS NULL) <> (organization_id IS NULL)", name="chk_bug_owner"),
+    )
 
-    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
-    workspace_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True)
+    workspace_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True, index=True)
     
     project_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True)
     repository_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("repositories.id", ondelete="SET NULL"), nullable=True, index=True)
@@ -85,10 +88,13 @@ class BugAttachment(AuditBase):
 
 class BugAssignment(AuditBase):
     __tablename__ = "bug_assignments"
+    __table_args__ = (
+        CheckConstraint("(workspace_id IS NULL) <> (organization_id IS NULL)", name="chk_bug_assignment_owner"),
+    )
     
     bug_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("bugs.id", ondelete="CASCADE"), nullable=False, index=True)
-    workspace_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
-    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True, index=True)
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True)
     developer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     assigned_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     assigned_at: Mapped[str | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -96,10 +102,13 @@ class BugAssignment(AuditBase):
 
 class BugComment(AuditBase):
     __tablename__ = "bug_comments"
+    __table_args__ = (
+        CheckConstraint("(workspace_id IS NULL) <> (organization_id IS NULL)", name="chk_bug_comment_owner"),
+    )
     
     bug_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("bugs.id", ondelete="CASCADE"), nullable=False, index=True)
-    workspace_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
-    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True, index=True)
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True)
     author_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     body: Mapped[str] = mapped_column(Text, nullable=False)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -108,11 +117,12 @@ class BugComment(AuditBase):
 class IdempotencyKey(AuditBase):
     __tablename__ = "idempotency_keys"
     __table_args__ = (
-        UniqueConstraint("workspace_id", "key", name="uix_workspace_id_key"),
+        UniqueConstraint("workspace_id", "organization_id", "key", name="uix_workspace_org_key"),
+        CheckConstraint("(workspace_id IS NULL) <> (organization_id IS NULL)", name="chk_idempotency_owner"),
     )
     
-    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
-    workspace_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True)
+    workspace_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True, index=True)
     key: Mapped[str] = mapped_column(String, nullable=False, index=True)
     request_hash: Mapped[str] = mapped_column(String, nullable=False)
     bug_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("bugs.id", ondelete="SET NULL"), nullable=True)

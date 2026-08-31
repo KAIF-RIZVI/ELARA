@@ -10,7 +10,7 @@ import json
 from app.api import deps
 from app.schemas.bug import BugIntakeCreate, BugResponse, BugCreate
 from app.services.bug import bug_service
-from app.models.identity import WorkspaceAPIKey
+from app.models.identity import APIKey
 from app.models.bug import BugSource, Bug
 from app.core.rate_limit import limiter
 from sqlalchemy import select
@@ -30,7 +30,7 @@ async def create_bug_intake(
     request: Request,
     bug_in: BugIntakeCreate,
     db: AsyncSession = Depends(deps.get_db),
-    api_key: WorkspaceAPIKey = Depends(deps.verify_workspace_api_key),
+    api_key: APIKey = Depends(deps.verify_api_key),
     idempotency_key: str | None = Header(None, alias="Idempotency-Key")
 ) -> Any:
     # Validate Idempotency-Key length if provided
@@ -52,9 +52,10 @@ async def create_bug_intake(
     if idempotency_key:
         import struct
         from sqlalchemy import func
-        # 1. Acquire transaction-level advisory lock based on workspace + key hash
+        # 1. Acquire transaction-level advisory lock based on workspace/org + key hash
         # This guarantees concurrent identical requests are serialized strictly
-        lock_hash = hashlib.sha256((str(ws_id) + idempotency_key).encode()).digest()
+        lock_seed = str(ws_id) if ws_id else str(org_id)
+        lock_hash = hashlib.sha256((lock_seed + idempotency_key).encode()).digest()
         lock_id = struct.unpack("q", lock_hash[:8])[0]
         
         await db.execute(select(func.pg_advisory_xact_lock(lock_id)))
@@ -62,7 +63,8 @@ async def create_bug_intake(
         # 2. Check if the key already exists
         result = await db.execute(
             select(IdempotencyKey).where(
-                IdempotencyKey.workspace_id == ws_id,
+                IdempotencyKey.organization_id.is_not_distinct_from(org_id),
+                IdempotencyKey.workspace_id.is_not_distinct_from(ws_id),
                 IdempotencyKey.key == idempotency_key
             )
         )

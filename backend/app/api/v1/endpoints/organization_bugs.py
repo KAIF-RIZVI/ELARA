@@ -1,7 +1,7 @@
 import uuid
 from typing import List
 from fastapi import APIRouter, HTTPException, Depends
-from app.api.deps import SessionDep, CurrentUser, RequireRole
+from app.api.deps import SessionDep, CurrentUser, RequireOrganizationRole
 from app.schemas.bug import (
     BugCreate, BugResponse, BugUpdate, BugStatusUpdate, 
     BugPriorityUpdate, BugAssignUpdate, BugCommentCreate, 
@@ -9,25 +9,25 @@ from app.schemas.bug import (
 )
 from app.schemas.workspace import ActivityLogResponse
 from app.services.bug import bug_service
-from app.services.workspace import workspace_service
-from app.models.identity import WorkspaceMember, MemberRole
+from app.services.organization import organization_service
+from app.models.organization import OrganizationMember, OrganizationRole as MemberRole
 
 router = APIRouter()
 
+
 @router.post("", response_model=BugResponse)
-async def create_workspace_bug(
-    workspace_id: uuid.UUID,
+async def create_organization_bug(
+    organization_id: uuid.UUID,
     bug_in: BugCreate,
     db: SessionDep, 
     current_user: CurrentUser, 
-    member: WorkspaceMember = Depends(RequireRole(MemberRole.VIEWER))
+    member: OrganizationMember = Depends(RequireOrganizationRole(MemberRole.VIEWER))
 ):
     try:
         bug = await bug_service.create_bug(
             db, 
             obj_in=bug_in,
-            
-            workspace_id=workspace_id,
+            organization_id=organization_id,
             user_id=current_user.id
         )
         return bug
@@ -35,44 +35,43 @@ async def create_workspace_bug(
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("", response_model=List[BugResponse])
-async def list_workspace_bugs(
-    workspace_id: uuid.UUID,
+async def list_organization_bugs(
+    organization_id: uuid.UUID,
     db: SessionDep, 
     current_user: CurrentUser, 
-    member: WorkspaceMember = Depends(RequireRole(MemberRole.VIEWER))
+    member: OrganizationMember = Depends(RequireOrganizationRole(MemberRole.VIEWER))
 ):
-    bugs = await bug_service.list_bugs(db,  workspace_id=workspace_id)
+    bugs = await bug_service.list_bugs(db, organization_id=organization_id)
     return bugs
 
 @router.get("/{bug_id}", response_model=BugResponse)
-async def get_workspace_bug(
-    workspace_id: uuid.UUID,
+async def get_organization_bug(
+    organization_id: uuid.UUID,
     bug_id: uuid.UUID,
     db: SessionDep, 
     current_user: CurrentUser, 
-    member: WorkspaceMember = Depends(RequireRole(MemberRole.VIEWER))
+    member: OrganizationMember = Depends(RequireOrganizationRole(MemberRole.VIEWER))
 ):
-    bug = await bug_service.get_bug(db, bug_id=bug_id,  workspace_id=workspace_id)
+    bug = await bug_service.get_bug(db, bug_id=bug_id, organization_id=organization_id)
     if not bug:
         raise HTTPException(status_code=404, detail="Bug not found")
     return bug
 
 @router.patch("/{bug_id}", response_model=BugResponse)
-async def update_workspace_bug(
-    workspace_id: uuid.UUID,
+async def update_organization_bug(
+    organization_id: uuid.UUID,
     bug_id: uuid.UUID,
     bug_in: BugUpdate,
     db: SessionDep, 
     current_user: CurrentUser, 
-    member: WorkspaceMember = Depends(RequireRole(MemberRole.VIEWER))
+    member: OrganizationMember = Depends(RequireOrganizationRole(MemberRole.VIEWER))
 ):
     try:
         bug = await bug_service.update_bug(
             db, 
             bug_id=bug_id,
             obj_in=bug_in,
-            
-            workspace_id=workspace_id,
+            organization_id=organization_id,
             user_id=current_user.id
         )
         return bug
@@ -81,20 +80,19 @@ async def update_workspace_bug(
 
 @router.post("/{bug_id}/status", response_model=BugResponse)
 async def update_bug_status(
-    workspace_id: uuid.UUID,
+    organization_id: uuid.UUID,
     bug_id: uuid.UUID,
     status_in: BugStatusUpdate,
     db: SessionDep, 
     current_user: CurrentUser, 
-    member: WorkspaceMember = Depends(RequireRole(MemberRole.VIEWER))
+    member: OrganizationMember = Depends(RequireOrganizationRole(MemberRole.VIEWER))
 ):
     try:
         bug = await bug_service.change_status(
             db, 
             bug_id=bug_id,
             obj_in=status_in,
-            
-            workspace_id=workspace_id,
+            organization_id=organization_id,
             user_id=current_user.id
         )
         return bug
@@ -103,20 +101,19 @@ async def update_bug_status(
 
 @router.post("/{bug_id}/priority", response_model=BugResponse)
 async def update_bug_priority(
-    workspace_id: uuid.UUID,
+    organization_id: uuid.UUID,
     bug_id: uuid.UUID,
     priority_in: BugPriorityUpdate,
     db: SessionDep, 
     current_user: CurrentUser, 
-    member: WorkspaceMember = Depends(RequireRole(MemberRole.VIEWER))
+    member: OrganizationMember = Depends(RequireOrganizationRole(MemberRole.VIEWER))
 ):
     try:
         bug = await bug_service.change_priority(
             db, 
             bug_id=bug_id,
             obj_in=priority_in,
-            
-            workspace_id=workspace_id,
+            organization_id=organization_id,
             user_id=current_user.id
         )
         return bug
@@ -125,20 +122,19 @@ async def update_bug_priority(
 
 @router.post("/{bug_id}/assign", response_model=BugResponse)
 async def assign_bug_developer(
-    workspace_id: uuid.UUID,
+    organization_id: uuid.UUID,
     bug_id: uuid.UUID,
     assign_in: BugAssignUpdate,
     db: SessionDep, 
     current_user: CurrentUser, 
-    member: WorkspaceMember = Depends(RequireRole(MemberRole.VIEWER))
+    member: OrganizationMember = Depends(RequireOrganizationRole(MemberRole.VIEWER))
 ):
     try:
         bug = await bug_service.assign_developer(
             db, 
             bug_id=bug_id,
             obj_in=assign_in,
-            
-            workspace_id=workspace_id,
+            organization_id=organization_id,
             user_id=current_user.id
         )
         return bug
@@ -147,20 +143,19 @@ async def assign_bug_developer(
 
 @router.post("/{bug_id}/comments", response_model=BugCommentResponse)
 async def add_bug_comment(
-    workspace_id: uuid.UUID,
+    organization_id: uuid.UUID,
     bug_id: uuid.UUID,
     comment_in: BugCommentCreate,
     db: SessionDep, 
     current_user: CurrentUser, 
-    member: WorkspaceMember = Depends(RequireRole(MemberRole.VIEWER))
+    member: OrganizationMember = Depends(RequireOrganizationRole(MemberRole.VIEWER))
 ):
     try:
         comment = await bug_service.add_comment(
             db, 
             bug_id=bug_id,
             obj_in=comment_in,
-            
-            workspace_id=workspace_id,
+            organization_id=organization_id,
             user_id=current_user.id
         )
         return comment
@@ -169,18 +164,17 @@ async def add_bug_comment(
 
 @router.get("/{bug_id}/comments", response_model=List[BugCommentResponse])
 async def list_bug_comments(
-    workspace_id: uuid.UUID,
+    organization_id: uuid.UUID,
     bug_id: uuid.UUID,
     db: SessionDep, 
     current_user: CurrentUser, 
-    member: WorkspaceMember = Depends(RequireRole(MemberRole.VIEWER))
+    member: OrganizationMember = Depends(RequireOrganizationRole(MemberRole.VIEWER))
 ):
     try:
         comments = await bug_service.list_comments(
             db, 
             bug_id=bug_id,
-            
-            workspace_id=workspace_id
+            organization_id=organization_id
         )
         return comments
     except ValueError as e:
@@ -188,18 +182,17 @@ async def list_bug_comments(
 
 @router.get("/{bug_id}/history", response_model=List[ActivityLogResponse])
 async def get_bug_history(
-    workspace_id: uuid.UUID,
+    organization_id: uuid.UUID,
     bug_id: uuid.UUID,
     db: SessionDep, 
     current_user: CurrentUser, 
-    member: WorkspaceMember = Depends(RequireRole(MemberRole.VIEWER))
+    member: OrganizationMember = Depends(RequireOrganizationRole(MemberRole.VIEWER))
 ):
     try:
         history = await bug_service.get_bug_history(
             db, 
             bug_id=bug_id,
-            
-            workspace_id=workspace_id
+            organization_id=organization_id
         )
         return history
     except ValueError as e:
@@ -209,20 +202,19 @@ from app.schemas.bug import BugCommentCreate, BugCommentResponse, ActivityLogRes
 
 @router.post("/{bug_id}/comments", response_model=BugCommentResponse)
 async def add_bug_comment(
-    workspace_id: uuid.UUID,
+    organization_id: uuid.UUID,
     bug_id: uuid.UUID,
     comment_in: BugCommentCreate,
     db: SessionDep, 
     current_user: CurrentUser, 
-    member: WorkspaceMember = Depends(RequireRole(MemberRole.DEVELOPER))
+    member: OrganizationMember = Depends(RequireOrganizationRole(MemberRole.DEVELOPER))
 ):
     try:
         return await bug_service.add_comment(
             db, 
             bug_id=bug_id,
             obj_in=comment_in,
-            
-            workspace_id=workspace_id,
+            organization_id=organization_id,
             user_id=current_user.id
         )
     except ValueError as e:
@@ -230,54 +222,51 @@ async def add_bug_comment(
 
 @router.get("/{bug_id}/comments", response_model=list[BugCommentResponse])
 async def list_bug_comments(
-    workspace_id: uuid.UUID,
+    organization_id: uuid.UUID,
     bug_id: uuid.UUID,
     db: SessionDep, 
     current_user: CurrentUser, 
-    member: WorkspaceMember = Depends(RequireRole(MemberRole.VIEWER))
+    member: OrganizationMember = Depends(RequireOrganizationRole(MemberRole.VIEWER))
 ):
     try:
         return await bug_service.list_comments(
             db, 
             bug_id=bug_id,
-            
-            workspace_id=workspace_id
+            organization_id=organization_id
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 @router.get("/{bug_id}/history", response_model=list[ActivityLogResponse])
 async def get_bug_history(
-    workspace_id: uuid.UUID,
+    organization_id: uuid.UUID,
     bug_id: uuid.UUID,
     db: SessionDep, 
     current_user: CurrentUser, 
-    member: WorkspaceMember = Depends(RequireRole(MemberRole.VIEWER))
+    member: OrganizationMember = Depends(RequireOrganizationRole(MemberRole.VIEWER))
 ):
     try:
         return await bug_service.get_bug_history(
             db, 
             bug_id=bug_id,
-            
-            workspace_id=workspace_id
+            organization_id=organization_id
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 @router.delete("/{bug_id}")
 async def soft_delete_bug(
-    workspace_id: uuid.UUID,
+    organization_id: uuid.UUID,
     bug_id: uuid.UUID,
     db: SessionDep, 
     current_user: CurrentUser, 
-    member: WorkspaceMember = Depends(RequireRole(MemberRole.ADMIN))
+    member: OrganizationMember = Depends(RequireOrganizationRole(MemberRole.ADMIN))
 ):
     try:
         await bug_service.delete_bug(
             db, 
             bug_id=bug_id,
-            
-            workspace_id=workspace_id,
+            organization_id=organization_id,
             user_id=current_user.id
         )
         return {"status": "deleted"}
@@ -291,19 +280,18 @@ from app.schemas.bug import BugAttachmentResponse
 
 @router.post("/{bug_id}/attachments", response_model=BugAttachmentResponse)
 async def upload_bug_attachment(
-    workspace_id: uuid.UUID,
+    organization_id: uuid.UUID,
     bug_id: uuid.UUID,
     db: SessionDep,
     current_user: CurrentUser,
     file: UploadFile = File(...),
-    member: WorkspaceMember = Depends(RequireRole(MemberRole.VIEWER))
+    member: OrganizationMember = Depends(RequireOrganizationRole(MemberRole.VIEWER))
 ):
     try:
         attachment = await attachment_service.upload_attachment(
             db,
             bug_id=bug_id,
-            
-            workspace_id=workspace_id,
+            organization_id=organization_id,
             file=file,
             user_id=current_user.id
         )
@@ -313,18 +301,17 @@ async def upload_bug_attachment(
         
 @router.get("/{bug_id}/attachments", response_model=List[BugAttachmentResponse])
 async def list_bug_attachments(
-    workspace_id: uuid.UUID,
+    organization_id: uuid.UUID,
     bug_id: uuid.UUID,
     db: SessionDep,
     current_user: CurrentUser,
-    member: WorkspaceMember = Depends(RequireRole(MemberRole.VIEWER))
+    member: OrganizationMember = Depends(RequireOrganizationRole(MemberRole.VIEWER))
 ):
     try:
         attachments = await attachment_service.list_attachments(
             db,
             bug_id=bug_id,
-            
-            workspace_id=workspace_id
+            organization_id=organization_id
         )
         return attachments
     except ValueError as e:
@@ -332,20 +319,19 @@ async def list_bug_attachments(
 
 @router.get("/{bug_id}/attachments/{attachment_id}/download")
 async def download_bug_attachment(
-    workspace_id: uuid.UUID,
+    organization_id: uuid.UUID,
     bug_id: uuid.UUID,
     attachment_id: uuid.UUID,
     db: SessionDep,
     current_user: CurrentUser,
-    member: WorkspaceMember = Depends(RequireRole(MemberRole.VIEWER))
+    member: OrganizationMember = Depends(RequireOrganizationRole(MemberRole.VIEWER))
 ):
     try:
         attachment = await attachment_service.get_attachment(
             db,
             attachment_id=attachment_id,
             bug_id=bug_id,
-            
-            workspace_id=workspace_id
+            organization_id=organization_id
         )
         if not attachment:
             raise HTTPException(status_code=404, detail="Attachment not found")
@@ -361,21 +347,22 @@ async def download_bug_attachment(
 
 @router.delete("/{bug_id}/attachments/{attachment_id}")
 async def delete_bug_attachment(
-    workspace_id: uuid.UUID,
+    organization_id: uuid.UUID,
     bug_id: uuid.UUID,
     attachment_id: uuid.UUID,
     db: SessionDep,
     current_user: CurrentUser,
-    member: WorkspaceMember = Depends(RequireRole(MemberRole.ADMIN))
+    member: OrganizationMember = Depends(RequireOrganizationRole(MemberRole.ADMIN))
 ):
     try:
         await attachment_service.delete_attachment(
             db,
             attachment_id=attachment_id,
             bug_id=bug_id,
-            
-            workspace_id=workspace_id
+            organization_id=organization_id
         )
         return {"status": "deleted"}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
